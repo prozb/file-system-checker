@@ -1,0 +1,16 @@
+#! /bin/sh
+
+make 
+
+if [ "$?" -ne 0 ]; then 
+    exit 1;
+fi
+
+if [ -d "bin" ]; then
+    printf "starting program:\n--------------------\n"
+    ./bin/run  
+
+    exit 0
+fi
+
+exit 1
