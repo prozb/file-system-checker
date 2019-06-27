@@ -18,11 +18,13 @@
 
 #define SECTOR_SIZE	512	/* disk sector size in bytes */
 #define BLOCK_SIZE	4096	/* disk block size in bytes */
+#define NICFREE		500	/* maximum number of free blocks in superblock */
 
 typedef unsigned int EOS32_ino_t;
 typedef unsigned int EOS32_daddr_t;
 typedef unsigned int EOS32_off_t;
 typedef int EOS32_time_t;
 
+void allocateFreeBlock(unsigned char *, EOS32_daddr_t *);
 void readBlock(FILE *, EOS32_daddr_t, unsigned char *);
 unsigned int get4Bytes(unsigned char *);

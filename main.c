@@ -9,12 +9,15 @@ unsigned int fsStart;
 
 int main(int argc, char *argv[]){
 	FILE *disk;
-
+	
+	// free blocks list (need to check that files are not in this list) 
+	EOS32_daddr_t freeList[NICFREE];
 	unsigned char partTable[SECTOR_SIZE];
 	unsigned char blockBuffer[BLOCK_SIZE];
 	unsigned char *ptptr;
 	unsigned int fsSize;
 	unsigned int partType;
+	unsigned int freeListSize;
 	int part;
 
 	if(argc < 3){
@@ -56,7 +59,14 @@ int main(int argc, char *argv[]){
     }
     fsStart = get4Bytes(ptptr + 4);
     fsSize = get4Bytes(ptptr + 8);
-	// readBlock(disk, 1, blockBuffer);
+	
+	// reading superblock and allocating free list 
+	readBlock(disk, 1, blockBuffer);
+	allocateFreeBlock(blockBuffer, &freeList);
+
+	// for(int i = 0; i < NICFREE; i++){
+	// 	printf("free block [%d] = %d\n", i, freeList[i]);
+	// }
 
 	return 0;
 }
@@ -75,4 +85,22 @@ unsigned int get4Bytes(unsigned char *addr) {
          (unsigned int) addr[1] << 16 |
          (unsigned int) addr[2] <<  8 |
          (unsigned int) addr[3] <<  0;
+}
+
+void allocateFreeBlock(unsigned char *p, EOS32_daddr_t *freeList) {
+	unsigned int nfree;
+	EOS32_daddr_t addr;
+	int i;
+
+	nfree = get4Bytes(p); 
+
+	p += 4;
+	for (i = 0; i < NICFREE; i++) {
+		addr = get4Bytes(p);
+		p += 4;
+		// adding block address to free list 
+		if (i < nfree) {
+			*(freeList + i) = addr; 
+		}
+	}
 }
