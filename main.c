@@ -207,7 +207,7 @@ int main(int argc, char *argv[]) {
         }
         readBlock(disk, 0, blockBuffer);
         blockPointer = blockBuffer;
-        blockPointer += 8; // skip Magic-Number
+        blockPointer += 8; // skip the first two Blocks
         inodeSize = get4Bytes(blockPointer);
 
         inodeTable = (Inode*) malloc(sizeof(Inode) * INOPB * inodeSize);
