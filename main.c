@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <time.h>
+#include <math.h>
 #include "main.h"
 
 unsigned int fsStart;
@@ -78,14 +79,158 @@ int main(int argc, char *argv[]){
 	readSuperBlock(blockBuffer, superBlock);
 
 	#ifdef DEBUG
-	for(int i = 0; i < superBlock->nfee; i++){
+	for(int i = 0; i < superBlock->nfree; i++){
 		fprintf(stdout, "free block[%d] = %d\n", i, superBlock->free_blocks[i]);
 	}
 	#endif
-	
+	// reading inode table (inoded per block is 64)
+	readBlock(disk, 2, blockBuffer);
+	readInodeTable(disk, blockBuffer, superBlock);
+
 	return 0;
 }
 
+
+void readInodeTable(FILE *disk, unsigned char *p, SuperBlock_Info *superBlock){
+	// use INOPB (inodes per block) to iterate over all blocks 
+	// containing inodes
+	double blockCount = superBlock->isize / (INOPB * 1.0);
+	int count;
+
+	if(ceilf(blockCount) != blockCount){ // is not integer
+		count = floor(blockCount) + 1;
+	}else{
+		count = (int) blockCount;
+	}
+
+	for(int i = 0; i < count; i++){
+		// iterating over inode blocks
+	}
+}
+
+void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
+// 	unsigned int mode;
+// 	unsigned int nlink;
+// 	unsigned int uid;
+// 	unsigned int gid;
+// 	EOS32_time_t tim;
+// 	char *dat;
+// 	EOS32_off_t size;
+// 	EOS32_daddr_t addr;
+// 	int i, j;
+
+// 	for (i = 0; i < INOPB; i++) {
+// 		mode = get4Bytes(p);
+// 		p += 4;
+// 		if (mode != 0) {
+// 		printf("  type/mode = 0x%08X = ", mode);
+// 		if ((mode & IFMT) == IFREG) {
+// 			printf("-");
+// 		} else
+// 		if ((mode & IFMT) == IFDIR) {
+// 			printf("d");
+// 		} else
+// 		if ((mode & IFMT) == IFCHR) {
+// 			printf("c");
+// 		} else
+// 		if ((mode & IFMT) == IFBLK) {
+// 			printf("b");
+// 		} else {
+// 			printf("?");
+// 		}
+// 		printf("%c", mode & IUREAD  ? 'r' : '-');
+// 		printf("%c", mode & IUWRITE ? 'w' : '-');
+// 		printf("%c", mode & IUEXEC  ? 'x' : '-');
+// 		printf("%c", mode & IGREAD  ? 'r' : '-');
+// 		printf("%c", mode & IGWRITE ? 'w' : '-');
+// 		printf("%c", mode & IGEXEC  ? 'x' : '-');
+// 		printf("%c", mode & IOREAD  ? 'r' : '-');
+// 		printf("%c", mode & IOWRITE ? 'w' : '-');
+// 		printf("%c", mode & IOEXEC  ? 'x' : '-');
+// 		if (mode & ISUID) {
+// 			printf(", set uid");
+// 		}
+// 		if (mode & ISGID) {
+// 			printf(", set gid");
+// 		}
+// 		if (mode & ISVTX) {
+// 			printf(", save text");
+// 		}
+// 		} else {
+// 		printf("  <free>");
+// 		}
+// 		printf("\n");
+// 		if (checkBatch(1)) return;
+// 		nlink = get4Bytes(p);
+// 		p += 4;
+// 		if (mode != 0) {
+// 		printf("  nlnk = %u (0x%08X)\n", nlink, nlink);
+// 		if (checkBatch(1)) return;
+// 		}
+// 		uid = get4Bytes(p);
+// 		p += 4;
+// 		if (mode != 0) {
+// 		printf("  uid  = %u (0x%08X)\n", uid, uid);
+// 		if (checkBatch(1)) return;
+// 		}
+// 		gid = get4Bytes(p);
+// 		p += 4;
+// 		if (mode != 0) {
+// 		printf("  gid  = %u (0x%08X)\n", gid, gid);
+// 		if (checkBatch(1)) return;
+// 		}
+// 		tim = get4Bytes(p);
+// 		p += 4;
+// 		dat = ctime((time_t *) &tim);
+// 		dat[strlen(dat) - 1] = '\0';
+// 		if (mode != 0) {
+// 		printf("  time inode created = %d (%s)\n", tim, dat);
+// 		if (checkBatch(1)) return;
+// 		}
+// 		tim = get4Bytes(p);
+// 		p += 4;
+// 		dat = ctime((time_t *) &tim);
+// 		dat[strlen(dat) - 1] = '\0';
+// 		if (mode != 0) {
+// 		printf("  time last modified = %d (%s)\n", tim, dat);
+// 		if (checkBatch(1)) return;
+// 		}
+// 		tim = get4Bytes(p);
+// 		p += 4;
+// 		dat = ctime((time_t *) &tim);
+// 		dat[strlen(dat) - 1] = '\0';
+// 		if (mode != 0) {
+// 		printf("  time last accessed = %d (%s)\n", tim, dat);
+// 		if (checkBatch(1)) return;
+// 		}
+// 		size = get4Bytes(p);
+// 		p += 4;
+// 		if (mode != 0) {
+// 		printf("  size = %u (0x%X)\n", size, size);
+// 		if (checkBatch(1)) return;
+// 		}
+// 		for (j = 0; j < 6; j++) {
+// 		addr = get4Bytes(p);
+// 		p += 4;
+// 		if (mode != 0) {
+// 			printf("  direct block[%1d] = %u (0x%X)\n", j, addr, addr);
+// 			if (checkBatch(1)) return;
+// 		}
+// 		}
+// 		addr = get4Bytes(p);
+// 		p += 4;
+// 		if (mode != 0) {
+// 		printf("  single indirect = %u (0x%X)\n", addr, addr);
+// 		if (checkBatch(1)) return;
+// 		}
+// 		addr = get4Bytes(p);
+// 		p += 4;
+// 		if (mode != 0) {
+// 		printf("  double indirect = %u (0x%X)\n", addr, addr);
+// 		if (checkBatch(1)) return;
+// 		}
+//   }
+}
 void readSuperBlock(unsigned char *p, SuperBlock_Info *superBlock_Info) {
 	EOS32_daddr_t fsize;
 	EOS32_daddr_t isize;
@@ -127,7 +272,7 @@ void readSuperBlock(unsigned char *p, SuperBlock_Info *superBlock_Info) {
 		}
   	}
 
-	superBlock_Info->nfee = nfree;
+	superBlock_Info->nfree = nfree;
 	superBlock_Info->freeblks = freeblks;
 	superBlock_Info->freeinos = freeinos;
 	superBlock_Info->fsize = fsize;
@@ -150,24 +295,6 @@ unsigned int get4Bytes(unsigned char *addr) {
          (unsigned int) addr[1] << 16 |
          (unsigned int) addr[2] <<  8 |
          (unsigned int) addr[3] <<  0;
-}
-
-void allocateFreeBlock(unsigned char *p, EOS32_daddr_t *freeList) {
-	unsigned int nfree;
-	EOS32_daddr_t addr;
-	int i;
-
-	nfree = get4Bytes(p); 
-
-	p += 4;
-	for (i = 0; i < NICFREE; i++) {
-		addr = get4Bytes(p);
-		p += 4;
-		// adding block address to free list 
-		if (i < nfree) {
-			*(freeList + i) = addr; 
-		}
-	}
 }
 
 void traversalTree(unsigned char *p, unsigned int blockNum) {
@@ -197,4 +324,10 @@ void traversalTree(unsigned char *p, unsigned int blockNum) {
 	// double indirect address
     addr = get4Bytes(p);
   }
+}
+
+void print_info(char *info){
+	#ifdef DEBUG
+	fprintf(stdout, "DEBUG: %s\n", info);
+	#endif
 }
