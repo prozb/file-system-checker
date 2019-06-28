@@ -82,13 +82,12 @@
     */
 
 typedef struct {
-
-} BlockCounter;
+// Todo
+} Inode;
 
 typedef struct {
-
-} InodeCounter;
-
+// ToDo
+} Block;
 
 /*
  * Format-Function for Error-Messages
@@ -104,7 +103,6 @@ void error(char *fmt, ...) {
     exit(1);
 }
 
-unsigned int fsStart;
 
 unsigned int get4Bytes(unsigned char *addr) {
     return (unsigned int) addr[0] << 24 |
@@ -112,6 +110,10 @@ unsigned int get4Bytes(unsigned char *addr) {
            (unsigned int) addr[2] << 8 |
            (unsigned int) addr[3] << 0;
 }
+
+unsigned int fsStart;
+Inode *inodeTable;
+Block *blockTable;
 
 int main(int argc, char *argv[]) {
     char *filename;
@@ -121,7 +123,7 @@ int main(int argc, char *argv[]) {
     unsigned int partType;
     unsigned int numBlocks;
     unsigned char partTable[SECTOR_SIZE];
-    char eos[] = "PLACEHOLDER";
+    //char eos[] = "PLACEHOLDER";
     //char partition[] = "PLACEHOLDER";
     FILE *disk = NULL;
     int partition;
@@ -175,6 +177,11 @@ int main(int argc, char *argv[]) {
         if (numBlocks < 2) {
             error("file system has less than 2 blocks");
             exit(9); // Exit-Code Number 9
+        }
+        blockTable = ((Block *) malloc(sizeof(Block) * numBlocks));
+        if (blockTable == NULL) {
+            error("Malloc could not be executed\n");
+            exit(6); // Exit-Code Number 6
         }
     }
 
