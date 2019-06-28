@@ -7,14 +7,21 @@
 #define NO_FILE_SYSTEM 5
 #define MEMORY_ALLOC_ERROR 6
 #define RANDOM_ERROR 9
+#define BLOCK_NOT_FOUND 10
+#define DATA_AND_FREELIST_BLOCK 11
+#define BLOCK_DUPLICATE_FREELIST 12
+#define BLOCK_DUPLICATE_DATA 13
+#define DATA_SIZE_INCONSISTENT 14
+#define INODE_LINK_COUNT_NULL_IN_DIR 15
+#define INODE_LINK_COUNT_NULL_NOT_EMPTY 16
+#define INODE_LINK_COUNT_APPEARANCE_FALSE 17
+#define INODE_TYPE_FIELD_INVALID 18
+#define INODE_FREE_IN_DIR 19
+#define ROOT_INODE_NO_DIR 20
+#define DIR_CANNOT_BE_REACHED_FROM_ROOT 21
+#define UNDEFINED_FILE_SYSTEM_ERROR 99
+#define UNDEFINED_ERROR 9
 
-// a) Falscher Aufruf des Programms: Exit-Code 1. 
-// b) Image-Datei nicht gefunden: Exit-Code 2. 
-// c) Datei Ein/Ausgabefehler: Exit-Code 3. 
-// d) Illegale Partitionsnummer: Exit-Code 4. 
-// e) Partition enthaelt kein EOS32-Dateisystem: Exit-Code 5. 
-// f) Erfolgloser Aufruf von malloc(): Exit-Code 6. 
-// g) Alle anderen Fehler: Exit-Code 9
 
 #define SECTOR_SIZE	512	/* disk sector size in bytes */
 #define BLOCK_SIZE	4096	/* disk block size in bytes */
