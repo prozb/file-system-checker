@@ -58,6 +58,9 @@
 #define BLOCK_SIZE	4096	/* disk block size in bytes */
 #define NICFREE		500	/* maximum number of free blocks in superblock */
 #define NICINOD		500	/* number of free inodes in superblock */
+#define SPB        (BLOCK_SIZE / SECTOR_SIZE)
+#define LINE_SIZE    100    /* input line buffer size in bytes */
+#define LINES_PER_BATCH    32    /* number of lines output in one batch */
 
 #define INOPB		64	/* number of inodes per block */
 #define DIRPB		64	/* number of directory entries per block */

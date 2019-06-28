@@ -13,6 +13,9 @@
  * */
 
 unsigned int fsStart;
+EOS32_off_t inodeSize;
+Inode *inodeTable;
+Block_Info *blockTable;
 
 #define DEBUG
 
@@ -23,10 +26,12 @@ int main(int argc, char *argv[]){
 	EOS32_daddr_t freeList[NICFREE];
 	unsigned char partTable[SECTOR_SIZE];
 	unsigned char blockBuffer[BLOCK_SIZE];
+    unsigned char *blockPointer;
 	unsigned char *ptptr;
 	unsigned int fsSize;
 	unsigned int partType;
 	unsigned int freeListSize;
+    unsigned int numBlocks;
 	int part;
 
 	SuperBlock_Info *superBlock;
@@ -77,9 +82,37 @@ int main(int argc, char *argv[]){
             part, argv[1]);
 		exit(NO_FILE_SYSTEM);
     }
+
     fsStart = get4Bytes(ptptr + 4);
     fsSize = get4Bytes(ptptr + 8);
-	
+
+    if (fsSize % SPB != 0) {
+        fprintf(stderr, "The File system size is not a multiple of block size.\n");
+        exit(99); // ToDo, is Exit-Code 99 correct?
+    }
+    numBlocks = fsSize / SPB;
+    printf("This equals %u (0x%X) blocks of %d bytes each.\n",
+           numBlocks, numBlocks, BLOCK_SIZE);
+    if (numBlocks < 2) {
+        fprintf(stderr, "The File system has less than 2 blocks");
+        exit(99); // Exit-Code Number 99
+    }
+    blockTable = ((Block_Info *) malloc(sizeof(Block_Info) * numBlocks));
+    if (blockTable == NULL) {
+        fprintf(stderr, "Malloc for the Block-Table could not be executed\n");
+        exit(6); // Exit-Code Number 6
+    }
+    readBlock(disk, 0, blockBuffer);
+    blockPointer = blockBuffer;
+    blockPointer += 8; // skip the first two Blocks
+    inodeSize = get4Bytes(blockPointer);
+
+    inodeTable = (Inode*) malloc(sizeof(Inode) * INOPB * inodeSize);
+    if(inodeTable == NULL){
+        fprintf(stderr, "Malloc for the Inode-Table could not be executed\n");
+        exit(6); // Exit-Code Number 6
+    }
+
 	// reading superblock and allocating free list 
 	readBlock(disk, 1, blockBuffer);
 	readSuperBlock(blockBuffer, superBlock);
