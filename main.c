@@ -23,36 +23,36 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
-#define SECTOR_SIZE	512	/* disk sector size in bytes */
-#define BLOCK_SIZE	4096	/* disk block size in bytes */
-#define SPB		(BLOCK_SIZE / SECTOR_SIZE)
-#define LINE_SIZE	100	/* input line buffer size in bytes */
-#define LINES_PER_BATCH	32	/* number of lines output in one batch */
+#define SECTOR_SIZE    512    /* disk sector size in bytes */
+#define BLOCK_SIZE    4096    /* disk block size in bytes */
+#define SPB        (BLOCK_SIZE / SECTOR_SIZE)
+#define LINE_SIZE    100    /* input line buffer size in bytes */
+#define LINES_PER_BATCH    32    /* number of lines output in one batch */
 
-#define NICINOD		500	/* number of free inodes in superblock */
-#define NICFREE		500	/* number of free blocks in superblock */
-#define INOPB		64	/* number of inodes per block */
-#define DIRPB		64	/* number of directory entries per block */
-#define DIRSIZ		60	/* max length of path name component */
+#define NICINOD        500    /* number of free inodes in superblock */
+#define NICFREE        500    /* number of free blocks in superblock */
+#define INOPB        64    /* number of inodes per block */
+#define DIRPB        64    /* number of directory entries per block */
+#define DIRSIZ        60    /* max length of path name component */
 
-#define IFMT		070000	/* type of file */
-#define   IFREG		040000	/* regular file */
-#define   IFDIR		030000	/* directory */
-#define   IFCHR		020000	/* character special */
-#define   IFBLK		010000	/* block special */
-#define   IFFREE	000000	/* reserved (indicates free inode) */
-#define ISUID		004000	/* set user id on execution */
-#define ISGID		002000	/* set group id on execution */
-#define ISVTX		001000	/* save swapped text even after use */
-#define IUREAD		000400	/* user's read permission */
-#define IUWRITE		000200	/* user's write permission */
-#define IUEXEC		000100	/* user's execute permission */
-#define IGREAD		000040	/* group's read permission */
-#define IGWRITE		000020	/* group's write permission */
-#define IGEXEC		000010	/* group's execute permission */
-#define IOREAD		000004	/* other's read permission */
-#define IOWRITE		000002	/* other's write permission */
-#define IOEXEC		000001	/* other's execute permission */
+#define IFMT        070000    /* type of file */
+#define   IFREG        040000    /* regular file */
+#define   IFDIR        030000    /* directory */
+#define   IFCHR        020000    /* character special */
+#define   IFBLK        010000    /* block special */
+#define   IFFREE    000000    /* reserved (indicates free inode) */
+#define ISUID        004000    /* set user id on execution */
+#define ISGID        002000    /* set group id on execution */
+#define ISVTX        001000    /* save swapped text even after use */
+#define IUREAD        000400    /* user's read permission */
+#define IUWRITE        000200    /* user's write permission */
+#define IUEXEC        000100    /* user's execute permission */
+#define IGREAD        000040    /* group's read permission */
+#define IGWRITE        000020    /* group's write permission */
+#define IGEXEC        000010    /* group's execute permission */
+#define IOREAD        000004    /* other's read permission */
+#define IOWRITE        000002    /* other's write permission */
+#define IOEXEC        000001    /* other's execute permission */
 
 /* Exit-Codes ToDo:
     Ein Block ist weder in einer Datei noch auf der Freiliste: Exit-Code 10.
@@ -83,11 +83,11 @@
 
 typedef struct {
 
-} BlockSize;
+} BlockCounter;
 
 typedef struct {
 
-} InodeSize;
+} InodeCounter;
 
 
 /*
@@ -104,18 +104,22 @@ void error(char *fmt, ...) {
     exit(1);
 }
 
+unsigned int fsStart;
+
 unsigned int get4Bytes(unsigned char *addr) {
     return (unsigned int) addr[0] << 24 |
            (unsigned int) addr[1] << 16 |
-           (unsigned int) addr[2] <<  8 |
-           (unsigned int) addr[3] <<  0;
+           (unsigned int) addr[2] << 8 |
+           (unsigned int) addr[3] << 0;
 }
 
 int main(int argc, char *argv[]) {
     char *filename;
     char *endptr;
     unsigned char *ptptr;
+    unsigned int fsSize;
     unsigned int partType;
+    unsigned int numBlocks;
     unsigned char partTable[SECTOR_SIZE];
     char eos[] = "PLACEHOLDER";
     //char partition[] = "PLACEHOLDER";
@@ -133,7 +137,7 @@ int main(int argc, char *argv[]) {
     if (disk == NULL) {
         error("cannot open disk image file '%s'", argv[1]);
     }
-    /* Interprets the disk image and partition number */
+        /* Interprets the disk image and partition number */
     else if (argc == 2) {
         filename = argv[1];
         partition = (strtoul(argv[2], &endptr, 10));
@@ -156,6 +160,21 @@ int main(int argc, char *argv[]) {
         if ((partType & 0x7FFFFFFF) != 0x00000058) {
             error("partition %d of disk '%s' does not contain an EOS32 file system", partition, argv[1]);
             exit(5); // Exit-Code Number 5
+        }
+        fsStart = get4Bytes(ptptr + 4);
+        fsSize = get4Bytes(ptptr + 8);
+
+        printf("File system has size %u (0x%X) sectors of %d bytes each.\n",
+               fsSize, fsSize, SECTOR_SIZE);
+        if (fsSize % SPB != 0) {
+            printf("File system size is not a multiple of block size.\n");
+        }
+        numBlocks = fsSize / SPB;
+        printf("This equals %u (0x%X) blocks of %d bytes each.\n",
+               numBlocks, numBlocks, BLOCK_SIZE);
+        if (numBlocks < 2) {
+            error("file system has less than 2 blocks");
+            exit(9); // Exit-Code Number 9
         }
     }
 
