@@ -136,7 +136,7 @@ void readBlock(FILE *disk,
 int main(int argc, char *argv[]) {
     char *filename;
     char *endptr;
-    char *blockPointer;
+    unsigned char *blockPointer;
     unsigned char *ptptr;
     unsigned int fsSize;
     unsigned int partType;
