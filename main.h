@@ -22,6 +22,37 @@
 #define UNDEFINED_FILE_SYSTEM_ERROR 99
 #define UNDEFINED_ERROR 9
 
+/* Exit-Codes ToDo:
+    Ein Block ist weder in einer Datei noch auf der Freiliste: Exit-Code 10.
+     Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
+    Ein Block ist mehr als einmal in der Freiliste: Exit-Code 12.
+    Ein Block ist mehr als einmal in einer Datei oder in mehr als einer Datei: Exit-Code 13.
+    Die Groesse einer Datei ist nicht konsistent mit den im Inode vermerkten Bloecken: Exit-Code 14.
+    Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
+    Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
+    Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
+    Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18.
+    Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
+     Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
+    Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
+    Alle anderen Dateisystem-Fehler: Exit-Code 99.
+    Alle anderen Fehler: Exit-Code 9.
+*/
+
+/* Exit-Codes pending
+    Erfolgloser Aufruf von malloc(): Exit-Code 6.
+    */
+
+
+/* Exit-Codes DONE
+    Falscher Aufruf des Programms: Exit-Code 1.
+    Image-Datei nicht gefunden: Exit-Code 2.
+    Datei Ein/Ausgabefehler: Exit-Code 3.
+    Illegale Partitionsnummer: Exit-Code 4.
+    Partition enthaelt kein EOS32-Dateisystem: Exit-Code 5.
+
+    */
+
 
 #define SECTOR_SIZE	512	/* disk sector size in bytes */
 #define BLOCK_SIZE	4096	/* disk block size in bytes */
