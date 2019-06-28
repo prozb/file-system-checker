@@ -89,6 +89,14 @@ typedef struct {
 // ToDo
 } Block;
 
+unsigned int fsStart;
+Inode *inodeTable;
+Block *blockTable;
+typedef unsigned int EOS32_ino_t;
+typedef unsigned int EOS32_daddr_t;
+typedef unsigned int EOS32_off_t;
+typedef int EOS32_time_t;
+
 /*
  * Format-Function for Error-Messages
  */
@@ -103,7 +111,6 @@ void error(char *fmt, ...) {
     exit(1);
 }
 
-
 unsigned int get4Bytes(unsigned char *addr) {
     return (unsigned int) addr[0] << 24 |
            (unsigned int) addr[1] << 16 |
@@ -111,9 +118,15 @@ unsigned int get4Bytes(unsigned char *addr) {
            (unsigned int) addr[3] << 0;
 }
 
-unsigned int fsStart;
-Inode *inodeTable;
-Block *blockTable;
+void readBlock(FILE *disk,
+               EOS32_daddr_t blockNum,
+               unsigned char *blockBuffer) {
+    fseek(disk, fsStart * SECTOR_SIZE + blockNum * BLOCK_SIZE, SEEK_SET);
+    if (fread(blockBuffer, BLOCK_SIZE, 1, disk) != 1) {
+        error("cannot read block %lu (0x%lX)", blockNum, blockNum);
+        exit(3); // Exit-Code Number 3
+    }
+}
 
 int main(int argc, char *argv[]) {
     char *filename;
