@@ -1,4 +1,3 @@
-#include <stdio.h>
 
 // ----- INPUT -----
 /* Zwei Shell-Parameter:
@@ -55,59 +54,65 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
+
+typedef struct {
+
+} BlockSize;
+
+typedef struct {
+
+} InodeSize;
+
+
+/*
+ * Format-Function for Error-Messages
+ */
+void error(char *fmt, ...) {
+    va_list ap;
+
+    va_start(ap, fmt);
+    printf("Error: ");
+    vprintf(fmt, ap);
+    printf("\n");
+    va_end(ap);
+    exit(1);
+}
+
 
 
 int main(int argc, char *argv[]) {
-    char *filename = "";
-    char *command = "";
+    char *filename;
+    char *endptr;
     char eos[] = "PLACEHOLDER";
-    char partition[] = "PLACEHOLDER";
-    FILE *loadedFile = NULL;
+    //char partition[] = "PLACEHOLDER";
+    FILE *disk = NULL;
+    int partition;
 
     /* Stops the Shell if there is no input */
     if (argc == 1) {
-        printf("Error: No Input");
+        printf("Usage: ./hu2 <EOS-IMG-FILE> [partition-number]\n");
         return (EXIT_FAILURE);
 
-        /* Prints all valid shell commands */
-    } else if (!strcmp(argv[1], "--help")) {
-        printf("Usage: ./hu2 <EOS-IMG-FILE> [partition] [option] \nOptions:\n"
-               "  --show          shows information about the partition\n"
-               "  --test          checks the partition for failure\n"
-               "  --help          shows all valid commands\n");
-        return (EXIT_SUCCESS);
+    }
+    /* Checks if the input is a valid disk image */
+    disk = fopen(argv[0], "rb");
+    if (disk == NULL) {
+        error("cannot open disk image file '%s'", argv[1]);
+    }
+    /* Interprets the disk image and partition number */
+    else if (argc == 2) {
+        filename = argv[1];
+        partition = (strtoul(argv[2], &endptr, 10));
+        if (*endptr != '\0' || partition < 0 || partition > 15) {
+            error("illegal partition number '%s'", argv[2]);
+            exit(4); // Exit-Code Number 4
+        }
+        disk = fopen(filename, "rb");
+        if (disk == NULL) {
+            printf("cannot find disk image %s\n", filename);
+            exit(2); // Exit-Code Number 2
+        }
+    }
 
-        /* Searches the arguments for a EOS-IMG-FILE file" */
-    } else if (argc == 2) {
-        if (strstr(argv[1], eos) == 0) {
-            printf("Error: no Partition-Number specified, try './hu2 --help'\n");
-            return (EXIT_FAILURE);
-        } else if (strstr(argv[1], partition) == 0) {
-            printf("Error: no EOS-IMG-FILE specified, try './hu2 --help'\n");
-            return (EXIT_FAILURE);
-        } else {
-            printf("Error: Input is not valid, try './hu2 --help'\n", argv[1]);
-            return EXIT_FAILURE;
-        }
-    } else if (argc == 3) {
-        if (strstr(argv[1], eos) != NULL) {
-            command = argv[2];
-            printf("Error: unknown option '%s', try './hu2 --help'\n", command);
-            return EXIT_FAILURE;
-        }
-        if (strstr(argv[2], partition) != NULL) {
-            command = argv[1];
-            printf("Error: unknown option '%s', try './hu2 --help'\n", command);
-            return EXIT_FAILURE;
-        }
-    }
-    if (strstr(argv[1], eos) != NULL) {
-        loadedFile = fopen(argv[1], "rb");
-    } else if (strstr(argv[2], partition) != NULL) {
-        loadedFile = fopen(argv[2], "rb");
-    }
-    if (!loadedFile) {
-        printf("Error: EOS-IMG-FILE '%s' cannot be opened \n", argv[1]);
-        return EXIT_FAILURE;
-    }
 }
