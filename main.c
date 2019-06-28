@@ -180,23 +180,25 @@ int main(int argc, char *argv[]) {
         ptptr = partTable + partition * 32;
         partType = get4Bytes(ptptr + 0);
         if ((partType & 0x7FFFFFFF) != 0x00000058) {
-            error("partition %d of disk '%s' does not contain an EOS32 file system", partition, argv[1]);
+            error("The partition %d of disk '%s' does not contain an EOS32 file system", partition, argv[1]);
             exit(5); // Exit-Code Number 5
         }
         fsStart = get4Bytes(ptptr + 4);
         fsSize = get4Bytes(ptptr + 8);
 
-        printf("File system has size %u (0x%X) sectors of %d bytes each.\n",
-               fsSize, fsSize, SECTOR_SIZE);
+        /* printf("The File system has size %u (0x%X) sectors of %d bytes each.\n",
+               fsSize, fsSize, SECTOR_SIZE); */
+
         if (fsSize % SPB != 0) {
-            printf("File system size is not a multiple of block size.\n");
+            error("The File system size is not a multiple of block size.\n");
+            exit(99); // ToDo, is Exit-Code 99 correct?
         }
         numBlocks = fsSize / SPB;
         printf("This equals %u (0x%X) blocks of %d bytes each.\n",
                numBlocks, numBlocks, BLOCK_SIZE);
         if (numBlocks < 2) {
-            error("file system has less than 2 blocks");
-            exit(9); // Exit-Code Number 9
+            error("The File system has less than 2 blocks");
+            exit(99); // Exit-Code Number 99
         }
         blockTable = ((Block *) malloc(sizeof(Block) * numBlocks));
         if (blockTable == NULL) {
