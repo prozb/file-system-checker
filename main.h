@@ -20,7 +20,6 @@
 #define ROOT_INODE_NO_DIR 20
 #define DIR_CANNOT_BE_REACHED_FROM_ROOT 21
 #define UNDEFINED_FILE_SYSTEM_ERROR 99
-#define UNDEFINED_ERROR 9
 
 /* Exit-Codes ToDo:
     Ein Block ist weder in einer Datei noch auf der Freiliste: Exit-Code 10.
