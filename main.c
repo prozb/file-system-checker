@@ -6,8 +6,8 @@
 #include <math.h>
 #include "main.h"
 
-/* ToDo-Gruppe:
- * David: Alle Exit Codes in den Header, David-Branch übertragen auf Master, Exit-Code 13, 15-19
+/* ToDo-Group:
+ * David: Exit-Code 13, 15-19
  * Pavlo: Exit Code 10, 11, 12
  *
  * */
