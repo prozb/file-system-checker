@@ -29,10 +29,10 @@
     m) Alle anderen Dateisystem-Fehler: Exit-Code 99.
 
     Andere moegliche Fehler, die geprueft werden muessen:
-    a) Falscher Aufruf des Programms: Exit-Code 1.
-    b) Image-Datei nicht gefunden: Exit-Code 2.
+    a) Falscher Aufruf des Programms: Exit-Code 1. // DONE
+    b) Image-Datei nicht gefunden: Exit-Code 2. // DONE
     c) Datei Ein/Ausgabefehler: Exit-Code 3.
-    d) Illegale Partitionsnummer: Exit-Code 4.
+    d) Illegale Partitionsnummer: Exit-Code 4. // DONE
     e) Partition enthaelt kein EOS32-Dateisystem: Exit-Code 5.
     f) Erfolgloser Aufruf von malloc(): Exit-Code 6.
     g) Alle anderen Fehler: Exit-Code 9.
@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
     /* Stops the Shell if there is no input */
     if (argc == 1) {
         printf("Usage: ./hu2 <EOS-IMG-FILE> [partition-number]\n");
-        return (EXIT_FAILURE);
+        exit(1); // Exit-Code Number 1
 
     }
     /* Checks if the input is a valid disk image */
@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
         }
         disk = fopen(filename, "rb");
         if (disk == NULL) {
-            printf("cannot find disk image %s\n", filename);
+            error("cannot find disk image %s\n", argv[1]);
             exit(2); // Exit-Code Number 2
         }
     }
