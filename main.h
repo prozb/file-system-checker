@@ -60,6 +60,9 @@ typedef struct SuperBlock_Info {
 	EOS32_daddr_t isize; // inode list size
 	EOS32_daddr_t freeblks; // free blocks size
 	EOS32_ino_t freeinos; // free inodes size
+
+    unsigned int nfee; // number of entries in free block
+    unsigned int *free_blocks;
 } SuperBlock_Info;
 
 void readSuperBlock(unsigned char *, SuperBlock_Info *);

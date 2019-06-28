@@ -7,6 +7,8 @@
 
 unsigned int fsStart;
 
+#define DEBUG
+
 int main(int argc, char *argv[]){
 	FILE *disk;
 	
@@ -20,18 +22,11 @@ int main(int argc, char *argv[]){
 	unsigned int freeListSize;
 	int part;
 
-	//  EOS32_daddr_t fsize;
-	// EOS32_daddr_t isize;
-	// EOS32_daddr_t freeblks;
-	// EOS32_ino_t freeinos;
-	// unsigned int ninode;
-	// unsigned int nfree;
-	// EOS32_daddr_t free;
-
 	SuperBlock_Info *superBlock;
-	superBlock = malloc(sizeof(EOS32_daddr_t) * 4 + 
+	superBlock = malloc(sizeof(EOS32_daddr_t) * 3 + 
 						sizeof(EOS32_ino_t) + 
-						sizeof(unsigned int));
+						sizeof(unsigned int) + 
+						sizeof(unsigned int *));
 
 	if(superBlock == NULL){
 		fprintf(stderr, "cannot allocate memory for superblock\n");
@@ -82,8 +77,12 @@ int main(int argc, char *argv[]){
 	readBlock(disk, 1, blockBuffer);
 	readSuperBlock(blockBuffer, superBlock);
 
-	printf("\n");
-
+	#ifdef DEBUG
+	for(int i = 0; i < superBlock->nfee; i++){
+		fprintf(stdout, "free block[%d] = %d\n", i, superBlock->free_blocks[i]);
+	}
+	#endif
+	
 	return 0;
 }
 
@@ -93,6 +92,7 @@ void readSuperBlock(unsigned char *p, SuperBlock_Info *superBlock_Info) {
 	EOS32_daddr_t freeblks;
 	EOS32_ino_t freeinos;
 	EOS32_daddr_t free;
+	unsigned int nfree; 
 	int i;
 
 	p += 4;
@@ -104,10 +104,35 @@ void readSuperBlock(unsigned char *p, SuperBlock_Info *superBlock_Info) {
 	p += 4;
 	freeinos = get4Bytes(p);
 
+	p += 8;
+  	for (i = 0; i < NICINOD; i++) {
+    	p += 4;
+  	}
+	
+	nfree = get4Bytes(p);
+	p += 4;
+  	
+	unsigned int *freeBlocks;
+	freeBlocks = malloc(sizeof(unsigned int) * nfree);
+	if(freeBlocks == NULL){
+		fprintf(stderr, "cannot allocate memory for free block list\n");
+		exit(MEMORY_ALLOC_ERROR);
+	}
+	
+  	for (i = 0; i < NICFREE; i++) {
+		free = get4Bytes(p);
+		p += 4;
+		if (i < nfree) {
+			*(freeBlocks + i) = free;  
+		}
+  	}
+
+	superBlock_Info->nfee = nfree;
 	superBlock_Info->freeblks = freeblks;
 	superBlock_Info->freeinos = freeinos;
 	superBlock_Info->fsize = fsize;
 	superBlock_Info->isize = isize;
+	superBlock_Info->free_blocks = freeBlocks;
 }
 
 
