@@ -31,9 +31,9 @@
     Andere moegliche Fehler, die geprueft werden muessen:
     a) Falscher Aufruf des Programms: Exit-Code 1. // DONE
     b) Image-Datei nicht gefunden: Exit-Code 2. // DONE
-    c) Datei Ein/Ausgabefehler: Exit-Code 3.
+    c) Datei Ein/Ausgabefehler: Exit-Code 3. // DONE
     d) Illegale Partitionsnummer: Exit-Code 4. // DONE
-    e) Partition enthaelt kein EOS32-Dateisystem: Exit-Code 5.
+    e) Partition enthaelt kein EOS32-Dateisystem: Exit-Code 5. // DONE
     f) Erfolgloser Aufruf von malloc(): Exit-Code 6.
     g) Alle anderen Fehler: Exit-Code 9.
  */
@@ -55,6 +55,37 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
+
+#define SECTOR_SIZE	512	/* disk sector size in bytes */
+#define BLOCK_SIZE	4096	/* disk block size in bytes */
+#define SPB		(BLOCK_SIZE / SECTOR_SIZE)
+#define LINE_SIZE	100	/* input line buffer size in bytes */
+#define LINES_PER_BATCH	32	/* number of lines output in one batch */
+
+#define NICINOD		500	/* number of free inodes in superblock */
+#define NICFREE		500	/* number of free blocks in superblock */
+#define INOPB		64	/* number of inodes per block */
+#define DIRPB		64	/* number of directory entries per block */
+#define DIRSIZ		60	/* max length of path name component */
+
+#define IFMT		070000	/* type of file */
+#define   IFREG		040000	/* regular file */
+#define   IFDIR		030000	/* directory */
+#define   IFCHR		020000	/* character special */
+#define   IFBLK		010000	/* block special */
+#define   IFFREE	000000	/* reserved (indicates free inode) */
+#define ISUID		004000	/* set user id on execution */
+#define ISGID		002000	/* set group id on execution */
+#define ISVTX		001000	/* save swapped text even after use */
+#define IUREAD		000400	/* user's read permission */
+#define IUWRITE		000200	/* user's write permission */
+#define IUEXEC		000100	/* user's execute permission */
+#define IGREAD		000040	/* group's read permission */
+#define IGWRITE		000020	/* group's write permission */
+#define IGEXEC		000010	/* group's execute permission */
+#define IOREAD		000004	/* other's read permission */
+#define IOWRITE		000002	/* other's write permission */
+#define IOEXEC		000001	/* other's execute permission */
 
 typedef struct {
 
@@ -79,11 +110,19 @@ void error(char *fmt, ...) {
     exit(1);
 }
 
-
+unsigned int get4Bytes(unsigned char *addr) {
+    return (unsigned int) addr[0] << 24 |
+           (unsigned int) addr[1] << 16 |
+           (unsigned int) addr[2] <<  8 |
+           (unsigned int) addr[3] <<  0;
+}
 
 int main(int argc, char *argv[]) {
     char *filename;
     char *endptr;
+    unsigned char *ptptr;
+    unsigned int partType;
+    unsigned char partTable[SECTOR_SIZE];
     char eos[] = "PLACEHOLDER";
     //char partition[] = "PLACEHOLDER";
     FILE *disk = NULL;
@@ -112,6 +151,17 @@ int main(int argc, char *argv[]) {
         if (disk == NULL) {
             error("cannot find disk image %s\n", argv[1]);
             exit(2); // Exit-Code Number 2
+        }
+        fseek(disk, 1 * SECTOR_SIZE, SEEK_SET);
+        if (fread(partTable, 1, SECTOR_SIZE, disk) != SECTOR_SIZE) {
+            error("cannot read partition table of disk '%s'", argv[1]);
+            exit(3); // Exit-Code Number 3
+        }
+        ptptr = partTable + partition * 32;
+        partType = get4Bytes(ptptr + 0);
+        if ((partType & 0x7FFFFFFF) != 0x00000058) {
+            error("partition %d of disk '%s' does not contain an EOS32 file system", partition, argv[1]);
+            exit(5); // Exit-Code Number 5
         }
     }
 
