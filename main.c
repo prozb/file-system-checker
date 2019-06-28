@@ -6,6 +6,12 @@
 #include <math.h>
 #include "main.h"
 
+/* ToDo-Gruppe:
+ * David: Alle Exit Codes in den Header, David-Branch übertragen auf Master, Exit-Code 13, 15-19
+ * Pavlo: Exit Code 10, 11, 12
+ *
+ * */
+
 /* Exit-Codes ToDo:
     Ein Block ist weder in einer Datei noch auf der Freiliste: Exit-Code 10.
      Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
