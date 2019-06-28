@@ -123,6 +123,43 @@ void readInodeTable(FILE *disk, unsigned char *p, SuperBlock_Info *superBlock){
 
 void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned int incount, unsigned char *p){
 	// inode can be read and checked
+	readBlock(disk, blockNum, p);
+
+	unsigned int mode;
+  	unsigned int nlink;
+  	EOS32_off_t size;
+  	EOS32_daddr_t addr;
+
+  	int i, j;
+
+  	for (i = 0; i < INOPB; i++) {
+		// todo: check mode != 0
+    	mode = get4Bytes(p);
+    	p += 4;
+		if (mode != 0) {
+			// inode not free
+		} else {
+			// inode free
+		}
+		nlink = get4Bytes(p);
+		p += 24;
+
+		size = get4Bytes(p);
+		p += 4;
+		
+		for (j = 0; j < 6; j++) {
+			// iterating over direct blocks
+			addr = get4Bytes(p);
+			p += 4;
+			// todo: store block 
+		}
+		// getting single indirect
+		addr = get4Bytes(p);
+		p += 4;
+		// getting double indirect
+		addr = get4Bytes(p);
+		p += 4;
+	}
 }
 
 void readSuperBlock(unsigned char *p, SuperBlock_Info *superBlock_Info) {

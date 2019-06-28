@@ -65,6 +65,13 @@ typedef struct SuperBlock_Info {
     unsigned int *free_blocks;
 } SuperBlock_Info;
 
+typedef struct Inode {
+    unsigned int mode;
+  	unsigned int nlink;
+  	EOS32_off_t size;
+  	EOS32_daddr_t *addr;
+} Inode;
+
 void readSuperBlock(unsigned char *, SuperBlock_Info *);
 void traversalTree(unsigned char *, unsigned int);
 void readInodeTable(FILE *, unsigned char *, SuperBlock_Info *);
