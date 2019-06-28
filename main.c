@@ -2,9 +2,9 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <time.h>
 #include "main.h"
 
-unsigned char *partition = "/home/przb86/Desktop/bs-task2/build/run/disk.img";
 unsigned int fsStart;
 
 int main(int argc, char *argv[]){
@@ -20,6 +20,24 @@ int main(int argc, char *argv[]){
 	unsigned int freeListSize;
 	int part;
 
+	//  EOS32_daddr_t fsize;
+	// EOS32_daddr_t isize;
+	// EOS32_daddr_t freeblks;
+	// EOS32_ino_t freeinos;
+	// unsigned int ninode;
+	// unsigned int nfree;
+	// EOS32_daddr_t free;
+
+	SuperBlock_Info *superBlock;
+	superBlock = malloc(sizeof(EOS32_daddr_t) * 4 + 
+						sizeof(EOS32_ino_t) + 
+						sizeof(unsigned int));
+
+	if(superBlock == NULL){
+		fprintf(stderr, "cannot allocate memory for superblock\n");
+		exit(MEMORY_ALLOC_ERROR);
+	}
+
 	if(argc < 3){
 		fprintf(stderr, "incorrect program: \"%s\" start\n", argv[1]);
 		exit(INCORRECT_START);
@@ -32,7 +50,7 @@ int main(int argc, char *argv[]){
 
 	disk = fopen(argv[1], "rb");
   	if (disk == NULL) {
-    	fprintf(stderr, "cannot open disk image file '%s', %d", partition, errno);
+    	fprintf(stderr, "cannot open disk image file '%s', %d", argv[1], errno);
 		exit(IO_ERROR);
   	}
 
@@ -62,14 +80,36 @@ int main(int argc, char *argv[]){
 	
 	// reading superblock and allocating free list 
 	readBlock(disk, 1, blockBuffer);
-	allocateFreeBlock(blockBuffer, &freeList);
+	readSuperBlock(blockBuffer, superBlock);
 
-	// for(int i = 0; i < NICFREE; i++){
-	// 	printf("free block [%d] = %d\n", i, freeList[i]);
-	// }
+	printf("\n");
 
 	return 0;
 }
+
+void readSuperBlock(unsigned char *p, SuperBlock_Info *superBlock_Info) {
+	EOS32_daddr_t fsize;
+	EOS32_daddr_t isize;
+	EOS32_daddr_t freeblks;
+	EOS32_ino_t freeinos;
+	EOS32_daddr_t free;
+	int i;
+
+	p += 4;
+	fsize = get4Bytes(p);
+	p += 4;
+	isize = get4Bytes(p);
+	p += 4;
+	freeblks = get4Bytes(p);
+	p += 4;
+	freeinos = get4Bytes(p);
+
+	superBlock_Info->freeblks = freeblks;
+	superBlock_Info->freeinos = freeinos;
+	superBlock_Info->fsize = fsize;
+	superBlock_Info->isize = isize;
+}
+
 
 void readBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *blockBuffer) {
   fseek(disk, fsStart * SECTOR_SIZE + blockNum * BLOCK_SIZE, SEEK_SET);
@@ -103,4 +143,33 @@ void allocateFreeBlock(unsigned char *p, EOS32_daddr_t *freeList) {
 			*(freeList + i) = addr; 
 		}
 	}
+}
+
+void traversalTree(unsigned char *p, unsigned int blockNum) {
+  unsigned int mode;
+  unsigned int nlink;
+  EOS32_off_t size;
+  EOS32_daddr_t addr;
+  int i, j;
+
+  for (i = 0; i < INOPB; i++) {
+    mode = get4Bytes(p);
+    p += 4;
+    
+    nlink = get4Bytes(p);
+    p += 4;
+
+	size = get4Bytes(p);
+    p += 4;
+    
+	for (j = 0; j < 6; j++) {
+      addr = get4Bytes(p);
+      p += 4;
+    }
+	// indirect address
+    addr = get4Bytes(p);
+    p += 4;
+	// double indirect address
+    addr = get4Bytes(p);
+  }
 }
