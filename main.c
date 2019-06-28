@@ -1,41 +1,8 @@
-
-// ----- INPUT -----
-/* Zwei Shell-Parameter:
- * - Dateiname der EOS32 IMG Datei
- * - Partitionsnummer
- */
-
 // ----- Logik -----
 /* - Ausführen eines Filesytem-Check auf der Partitionsnummer
  * - Erkennen von Fehlersituationen im Dateisystem
  * - Ausgabe von Fehlermeldung bei auftreten einer Fehlersituation und abbruch mit entsprechendem EXIT-Code
  * - Prinzipiell sind zu ueberpruefen: Bloecke, Dateien (d.h. Inodes), Verzeichnisse.
- */
-
-// ----- EXIT-Codes ------
-/*
- *  a) Ein Block ist weder in einer Datei noch auf der Freiliste: Exit-Code 10.
-    b) Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
-    c) Ein Block ist mehr als einmal in der Freiliste: Exit-Code 12.
-    d) Ein Block ist mehr als einmal in einer Datei oder in mehr als einer Datei: Exit-Code 13.
-    e) Die Groesse einer Datei ist nicht konsistent mit den im Inode vermerkten Bloecken: Exit-Code 14.
-    f) Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
-    g) Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
-    h) Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
-    i) Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18.
-    j) Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
-    k) Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
-    l) Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
-    m) Alle anderen Dateisystem-Fehler: Exit-Code 99.
-
-    Andere moegliche Fehler, die geprueft werden muessen:
-    a) Falscher Aufruf des Programms: Exit-Code 1. // DONE
-    b) Image-Datei nicht gefunden: Exit-Code 2. // DONE
-    c) Datei Ein/Ausgabefehler: Exit-Code 3. // DONE
-    d) Illegale Partitionsnummer: Exit-Code 4. // DONE
-    e) Partition enthaelt kein EOS32-Dateisystem: Exit-Code 5. // DONE
-    f) Erfolgloser Aufruf von malloc(): Exit-Code 6.
-    g) Alle anderen Fehler: Exit-Code 9.
  */
 
 // --------- HINWEISE --------
@@ -86,6 +53,33 @@
 #define IOREAD		000004	/* other's read permission */
 #define IOWRITE		000002	/* other's write permission */
 #define IOEXEC		000001	/* other's execute permission */
+
+/* Exit-Codes ToDo:
+    Ein Block ist weder in einer Datei noch auf der Freiliste: Exit-Code 10.
+     Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
+    Ein Block ist mehr als einmal in der Freiliste: Exit-Code 12.
+    Ein Block ist mehr als einmal in einer Datei oder in mehr als einer Datei: Exit-Code 13.
+    Die Groesse einer Datei ist nicht konsistent mit den im Inode vermerkten Bloecken: Exit-Code 14.
+    Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
+    Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
+    Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
+    Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18.
+    Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
+     Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
+    Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
+    Alle anderen Dateisystem-Fehler: Exit-Code 99.
+    Erfolgloser Aufruf von malloc(): Exit-Code 6.
+    Alle anderen Fehler: Exit-Code 9.
+*/
+
+/* Exit-Codes DONE
+    Falscher Aufruf des Programms: Exit-Code 1.
+    Image-Datei nicht gefunden: Exit-Code 2.
+    Datei Ein/Ausgabefehler: Exit-Code 3.
+    Illegale Partitionsnummer: Exit-Code 4.
+    Partition enthaelt kein EOS32-Dateisystem: Exit-Code 5.
+
+    */
 
 typedef struct {
 
