@@ -172,17 +172,20 @@ int main(int argc, char *argv[]) {
             error("cannot find disk image %s\n", argv[1]);
             exit(2); // Exit-Code Number 2
         }
+        /* reads the partition table */
         fseek(disk, 1 * SECTOR_SIZE, SEEK_SET);
         if (fread(partTable, 1, SECTOR_SIZE, disk) != SECTOR_SIZE) {
             error("cannot read partition table of disk '%s'", argv[1]);
             exit(3); // Exit-Code Number 3
         }
+        /* checks if the parition table contains a EOS32 file system */
         ptptr = partTable + partition * 32;
         partType = get4Bytes(ptptr + 0);
         if ((partType & 0x7FFFFFFF) != 0x00000058) {
             error("The partition %d of disk '%s' does not contain an EOS32 file system", partition, argv[1]);
             exit(5); // Exit-Code Number 5
         }
+        /* determines the start of the file system and its size */
         fsStart = get4Bytes(ptptr + 4);
         fsSize = get4Bytes(ptptr + 8);
 
