@@ -65,10 +65,9 @@ typedef struct SuperBlock_Info {
     unsigned int *free_blocks;
 } SuperBlock_Info;
 
-void print_info(char *);
 void readSuperBlock(unsigned char *, SuperBlock_Info *);
 void traversalTree(unsigned char *, unsigned int);
 void readInodeTable(FILE *, unsigned char *, SuperBlock_Info *);
-void readInodeBlock(FILE *disk, EOS32_daddr_t, unsigned char *);
+void readInodeBlock(FILE *disk, EOS32_daddr_t, unsigned int, unsigned char *);
 void readBlock(FILE *, EOS32_daddr_t, unsigned char *);
 unsigned int get4Bytes(unsigned char *);
