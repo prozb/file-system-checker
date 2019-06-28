@@ -88,19 +88,19 @@ int main(int argc, char *argv[]){
 
     if (fsSize % SPB != 0) {
         fprintf(stderr, "The File system size is not a multiple of block size.\n");
-        exit(99); // ToDo, is Exit-Code 99 correct?
+        exit(UNDEFINED_FILE_SYSTEM_ERROR); // ToDo, is Exit-Code 99 correct?
     }
     numBlocks = fsSize / SPB;
     printf("This equals %u (0x%X) blocks of %d bytes each.\n",
            numBlocks, numBlocks, BLOCK_SIZE);
     if (numBlocks < 2) {
         fprintf(stderr, "The File system has less than 2 blocks");
-        exit(99); // Exit-Code Number 99
+        exit(UNDEFINED_FILE_SYSTEM_ERROR); // Exit-Code Number 99
     }
     blockTable = ((Block_Info *) malloc(sizeof(Block_Info) * numBlocks));
     if (blockTable == NULL) {
         fprintf(stderr, "Malloc for the Block-Table could not be executed\n");
-        exit(6); // Exit-Code Number 6
+        exit(MEMORY_ALLOC_ERROR); // Exit-Code Number 6
     }
     readBlock(disk, 0, blockBuffer);
     blockPointer = blockBuffer;
@@ -110,7 +110,7 @@ int main(int argc, char *argv[]){
     inodeTable = (Inode*) malloc(sizeof(Inode) * INOPB * inodeSize);
     if(inodeTable == NULL){
         fprintf(stderr, "Malloc for the Inode-Table could not be executed\n");
-        exit(6); // Exit-Code Number 6
+        exit(MEMORY_ALLOC_ERROR); // Exit-Code Number 6
     }
 
 	// reading superblock and allocating free list 
