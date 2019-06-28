@@ -68,9 +68,13 @@
      Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
     Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
     Alle anderen Dateisystem-Fehler: Exit-Code 99.
-    Erfolgloser Aufruf von malloc(): Exit-Code 6.
     Alle anderen Fehler: Exit-Code 9.
 */
+
+/* Exit-Codes pending
+    Erfolgloser Aufruf von malloc(): Exit-Code 6.
+    */
+
 
 /* Exit-Codes DONE
     Falscher Aufruf des Programms: Exit-Code 1.
@@ -96,6 +100,7 @@ typedef unsigned int EOS32_ino_t;
 typedef unsigned int EOS32_daddr_t;
 typedef unsigned int EOS32_off_t;
 typedef int EOS32_time_t;
+EOS32_off_t inodeSize;
 
 /*
  * Format-Function for Error-Messages
@@ -131,11 +136,13 @@ void readBlock(FILE *disk,
 int main(int argc, char *argv[]) {
     char *filename;
     char *endptr;
+    char *blockPointer;
     unsigned char *ptptr;
     unsigned int fsSize;
     unsigned int partType;
     unsigned int numBlocks;
     unsigned char partTable[SECTOR_SIZE];
+    unsigned char blockBuffer[BLOCK_SIZE];
     //char eos[] = "PLACEHOLDER";
     //char partition[] = "PLACEHOLDER";
     FILE *disk = NULL;
@@ -193,7 +200,17 @@ int main(int argc, char *argv[]) {
         }
         blockTable = ((Block *) malloc(sizeof(Block) * numBlocks));
         if (blockTable == NULL) {
-            error("Malloc could not be executed\n");
+            error("Malloc for the Block-Table could not be executed\n");
+            exit(6); // Exit-Code Number 6
+        }
+        readBlock(disk, 0, blockBuffer);
+        blockPointer = blockBuffer;
+        blockPointer += 8; // skip Magic-Number
+        inodeSize = get4Bytes(blockPointer);
+
+        inodeTable = (Inode*) malloc(sizeof(Inode) * INOPB * inodeSize);
+        if(inodeTable == NULL){
+            printf("Malloc for the Inode-Table could not be executed\n");
             exit(6); // Exit-Code Number 6
         }
     }
