@@ -169,11 +169,7 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 		// todo: check mode != 0
     	mode = get4Bytes(p);
     	p += 4;
-		if (mode != 0) {
-			// inode not free
-		} else {
-			// inode free
-		}
+		
 		nlink = get4Bytes(p);
 		p += 24;
 
@@ -199,13 +195,7 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 			if(addr > 0){
 				blockInfos[addr].file_occur = 1;
 				// reading indirect block
-				// readBlock(disk, addr, p);
-			
-				// indirectBlock(p);
-				// // returning internal file pointer to before single indirection
-				// readBlock(disk, blockNum, p);
-				// // adding offset in inode to get double indirect address next
-				// p += ((i + 1) * INOPB + 60);
+				indirectBlock(disk, addr);
 			}
 			// getting double indirect
 			addr = get4Bytes(p);
@@ -213,11 +203,6 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 
 			if(addr > 0){
 				blockInfos[addr].file_occur = 1;
-				// traversalDoubleIndirect(disk, addr, p);
-				// returning internal file pointer
-				// readBlock(disk, blockNum, p);
-				// adding offset in inode
-				// p += ((i + 1) * INOPB + 64);
 			}
 		}else{
 			p += 32;
@@ -225,35 +210,23 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 	}
 }
 
-void traversalDoubleIndirect(FILE *disk, EOS32_daddr_t blockAddress, unsigned char *p){
-	readBlock(disk, blockAddress, p);
-	
+void indirectBlock(FILE *disk, EOS32_daddr_t blockNum) {
+  	unsigned char buffer [BLOCK_SIZE];
+	unsigned char *p;
 	EOS32_daddr_t addr;
   	int i;
 
-	for (i = 0; i < BLOCK_SIZE / sizeof(EOS32_daddr_t); i++) {
-		addr = get4Bytes(p);
-		p += 4;
-		
-		// todo: make fseek and test
-		if(addr > 0){
-			blockInfos[addr].file_occur = 1;
-			readBlock(disk, addr, p);
-			indirectBlock(p);
-		}
-	}
-}
+	p = buffer;
 
-void indirectBlock(unsigned char *p) {
-  	EOS32_daddr_t addr;
-  	int i;
-
+	readBlock(disk, blockNum, buffer);
 	for (i = 0; i < BLOCK_SIZE / sizeof(EOS32_daddr_t); i++) {
 		addr = get4Bytes(p);
 		p += 4;
 		
 		if(addr > 0){
 			blockInfos[addr].file_occur = 1;
+		}else{
+			break;
 		}
 	}
 }

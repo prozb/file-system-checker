@@ -71,8 +71,7 @@ typedef struct Inode {
   	EOS32_daddr_t addr;
 } Inode;
 
-void traversalDoubleIndirect(FILE *, EOS32_daddr_t , unsigned char *);
-void indirectBlock(unsigned char *);
+void indirectBlock(FILE *, EOS32_daddr_t);
 void readSuperBlock(unsigned char *, SuperBlock_Info *);
 void readInodeTable(FILE *, unsigned char *, SuperBlock_Info *);
 void readInodeBlock(FILE *disk, EOS32_daddr_t, unsigned char *);
