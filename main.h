@@ -52,11 +52,10 @@ typedef int EOS32_time_t;
 typedef struct Block_Info {
     unsigned int file_occur;
     unsigned int free_list_occur;
-    EOS32_daddr_t address;
 } Block_Info;
 
 typedef struct SuperBlock_Info {
-    EOS32_daddr_t fsize; // file system size
+    EOS32_daddr_t fsize; // file system size in blocks
 	EOS32_daddr_t isize; // inode list size
 	EOS32_daddr_t freeblks; // free blocks size
 	EOS32_ino_t freeinos; // free inodes size
@@ -69,12 +68,13 @@ typedef struct Inode {
     unsigned int mode;
   	unsigned int nlink;
   	EOS32_off_t size;
-  	EOS32_daddr_t *addr;
+  	EOS32_daddr_t addr;
 } Inode;
 
+void traversalDoubleIndirect(FILE *, EOS32_daddr_t , unsigned char *);
+void indirectBlock(unsigned char *);
 void readSuperBlock(unsigned char *, SuperBlock_Info *);
-void traversalTree(unsigned char *, unsigned int);
 void readInodeTable(FILE *, unsigned char *, SuperBlock_Info *);
-void readInodeBlock(FILE *disk, EOS32_daddr_t, unsigned int, unsigned char *);
+void readInodeBlock(FILE *disk, EOS32_daddr_t, unsigned char *);
 void readBlock(FILE *, EOS32_daddr_t, unsigned char *);
 unsigned int get4Bytes(unsigned char *);

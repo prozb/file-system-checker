@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
+#include <errno.h>
 #include "main.h"
 
 /* ToDo-Gruppe:
@@ -43,8 +44,9 @@
 
     */
 
-unsigned int fsStart;
-
+static unsigned int fsStart;
+// information about all blocks in file system
+static Block_Info *blockInfos; 
 #define DEBUG
 
 int main(int argc, char *argv[]){
@@ -113,52 +115,45 @@ int main(int argc, char *argv[]){
 	
 	// reading superblock and allocating free list 
 	readBlock(disk, 1, blockBuffer);
+	// readBlock(disk, 124, blockBuffer);
+
 	readSuperBlock(blockBuffer, superBlock);
 
-	#ifdef DEBUG
-	for(int i = 0; i < superBlock->nfree; i++){
-		fprintf(stdout, "free block[%d] = %d\n", i, superBlock->free_blocks[i]);
+	// allocating memory for list with information about each 
+	// memory block in the system
+	blockInfos = malloc(superBlock->fsize * sizeof(unsigned int) * 2);
+	if(blockInfos == NULL){
+		fprintf(stderr, "cannot allocate memory for list with information about each system block\n");
+		exit(MEMORY_ALLOC_ERROR);
 	}
+	
+	#ifdef DEBUG
+	// for(int i = 0; i < superBlock->nfree; i++){
+	// 	fprintf(stdout, "free block[%d] = %d\n", i, superBlock->free_blocks[i]);
+	// }
 	#endif
 	// reading inode table (inoded per block is 64)
 	readBlock(disk, 2, blockBuffer);
 	readInodeTable(disk, blockBuffer, superBlock);
+
+	#ifdef DEBUG
+	for(int i = 0; i < 1000; i++){
+		fprintf(stdout, "block[%d] = %d\n", i, (blockInfos + i)->file_occur);
+	}
+	#endif
 
 	return 0;
 }
 
 
 void readInodeTable(FILE *disk, unsigned char *p, SuperBlock_Info *superBlock){
-	// use INOPB (inodes per block) to iterate over all blocks 
-	// containing inodes
-	double blockCount = superBlock->isize / (INOPB * 1.0);
-	int firstInode = 2; // posisiton if the  first inode block in partition
-	int count;			// count of inode blocks in partition
-
-	// calculating how much inode blocks should be read from partition
-	if(ceilf(blockCount) != blockCount){ // is not integer
-		count = floor(blockCount) + 1;
-	}else{
-		count = (int) blockCount;
-	}
-
-	int inodesSize = superBlock->isize;
 	// iterating over inode blocks
-	for(int i = 0; i < count; i++){
-		int inodes2Read = 0;
-
-		if(inodesSize / INOPB > 0){
-			inodes2Read = INOPB;
-		}else{
-			inodes2Read = inodesSize % INOPB;
-		}
-		inodesSize -= INOPB;
-
-		readInodeBlock(disk, firstInode + i, inodes2Read, p);
+	for(int i = 2; i < superBlock->isize + 2; i++){
+		readInodeBlock(disk, i, p);
 	}
 }
 
-void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned int incount, unsigned char *p){
+void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 	// inode can be read and checked
 	readBlock(disk, blockNum, p);
 
@@ -170,6 +165,7 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned int incount, un
   	int i, j;
 
   	for (i = 0; i < INOPB; i++) {
+		unsigned char *backup = p;
 		// todo: check mode != 0
     	mode = get4Bytes(p);
     	p += 4;
@@ -183,21 +179,85 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned int incount, un
 
 		size = get4Bytes(p);
 		p += 4;
-		
-		for (j = 0; j < 6; j++) {
-			// iterating over direct blocks
+		// skipping handling blocks of character and block devices
+		if (((mode & IFMT) != IFCHR) && ((mode & IFMT) != IFBLK)) {
+			for (j = 0; j < 6; j++) {
+				// iterating over direct blocks
+				addr = get4Bytes(p);
+				p += 4;
+
+				// incrementing occurrece in files if block address not zero
+				if(addr > 0){
+					blockInfos[addr].file_occur = 1;
+				}
+			}
+			
+			// getting single indirect
 			addr = get4Bytes(p);
 			p += 4;
-			// todo: store block 
+
+			if(addr > 0){
+				blockInfos[addr].file_occur = 1;
+				// reading indirect block
+				// readBlock(disk, addr, p);
+			
+				// indirectBlock(p);
+				// // returning internal file pointer to before single indirection
+				// readBlock(disk, blockNum, p);
+				// // adding offset in inode to get double indirect address next
+				// p += ((i + 1) * INOPB + 60);
+			}
+			// getting double indirect
+			addr = get4Bytes(p);
+			p += 4;
+
+			if(addr > 0){
+				blockInfos[addr].file_occur = 1;
+				// traversalDoubleIndirect(disk, addr, p);
+				// returning internal file pointer
+				// readBlock(disk, blockNum, p);
+				// adding offset in inode
+				// p += ((i + 1) * INOPB + 64);
+			}
+		}else{
+			p += 32;
 		}
-		// getting single indirect
-		addr = get4Bytes(p);
-		p += 4;
-		// getting double indirect
-		addr = get4Bytes(p);
-		p += 4;
 	}
 }
+
+void traversalDoubleIndirect(FILE *disk, EOS32_daddr_t blockAddress, unsigned char *p){
+	readBlock(disk, blockAddress, p);
+	
+	EOS32_daddr_t addr;
+  	int i;
+
+	for (i = 0; i < BLOCK_SIZE / sizeof(EOS32_daddr_t); i++) {
+		addr = get4Bytes(p);
+		p += 4;
+		
+		// todo: make fseek and test
+		if(addr > 0){
+			blockInfos[addr].file_occur = 1;
+			readBlock(disk, addr, p);
+			indirectBlock(p);
+		}
+	}
+}
+
+void indirectBlock(unsigned char *p) {
+  	EOS32_daddr_t addr;
+  	int i;
+
+	for (i = 0; i < BLOCK_SIZE / sizeof(EOS32_daddr_t); i++) {
+		addr = get4Bytes(p);
+		p += 4;
+		
+		if(addr > 0){
+			blockInfos[addr].file_occur = 1;
+		}
+	}
+}
+
 
 void readSuperBlock(unsigned char *p, SuperBlock_Info *superBlock_Info) {
 	EOS32_daddr_t fsize;
@@ -250,12 +310,12 @@ void readSuperBlock(unsigned char *p, SuperBlock_Info *superBlock_Info) {
 
 
 void readBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *blockBuffer) {
-  fseek(disk, fsStart * SECTOR_SIZE + blockNum * BLOCK_SIZE, SEEK_SET);
+	fseek(disk, fsStart * SECTOR_SIZE + blockNum * BLOCK_SIZE, SEEK_SET);
 
-  if (fread(blockBuffer, BLOCK_SIZE, 1, disk) != 1) {
-    fprintf(stderr, "cannot read block %lu (0x%lX)", blockNum, blockNum);
-	exit(IO_ERROR);
-  }
+  	if (fread(blockBuffer, BLOCK_SIZE, 1, disk) != 1) {
+    	fprintf(stderr, "cannot read block %lu (0x%lX)", blockNum, blockNum);
+		exit(IO_ERROR);
+  	}
 }
 
 unsigned int get4Bytes(unsigned char *addr) {
@@ -263,33 +323,4 @@ unsigned int get4Bytes(unsigned char *addr) {
          (unsigned int) addr[1] << 16 |
          (unsigned int) addr[2] <<  8 |
          (unsigned int) addr[3] <<  0;
-}
-
-void traversalTree(unsigned char *p, unsigned int blockNum) {
-  unsigned int mode;
-  unsigned int nlink;
-  EOS32_off_t size;
-  EOS32_daddr_t addr;
-  int i, j;
-
-  for (i = 0; i < INOPB; i++) {
-    mode = get4Bytes(p);
-    p += 4;
-    
-    nlink = get4Bytes(p);
-    p += 4;
-
-	size = get4Bytes(p);
-    p += 4;
-    
-	for (j = 0; j < 6; j++) {
-      addr = get4Bytes(p);
-      p += 4;
-    }
-	// indirect address
-    addr = get4Bytes(p);
-    p += 4;
-	// double indirect address
-    addr = get4Bytes(p);
-  }
 }
