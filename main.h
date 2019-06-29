@@ -64,19 +64,22 @@ typedef struct SuperBlock_Info {
 	EOS32_ino_t freeinos; // free inodes size
 
     unsigned int nfree; // number of entries in free block
-    unsigned int *free_blocks;
+    EOS32_daddr_t *free_blocks;
 } SuperBlock_Info;
 
 typedef struct Inode {
     unsigned int mode;
   	unsigned int nlink;
+
   	EOS32_off_t size;
   	EOS32_daddr_t addr;
 } Inode;
 
 void indirectBlock(FILE *, EOS32_daddr_t, unsigned char);
+void freeBlock(FILE *, EOS32_daddr_t *, EOS32_daddr_t);
+void readFreeBlocks(FILE *, SuperBlock_Info *);
 void readSuperBlock(unsigned char *, SuperBlock_Info *);
-void readInodeTable(FILE *, unsigned char *, SuperBlock_Info *);
+void readInodeTable(FILE *, SuperBlock_Info *);
 void readInodeBlock(FILE *disk, EOS32_daddr_t, unsigned char *);
 void readBlock(FILE *, EOS32_daddr_t, unsigned char *);
 unsigned int get4Bytes(unsigned char *);

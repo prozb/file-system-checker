@@ -115,8 +115,6 @@ int main(int argc, char *argv[]){
 	
 	// reading superblock and allocating free list 
 	readBlock(disk, 1, blockBuffer);
-	// readBlock(disk, 124, blockBuffer);
-
 	readSuperBlock(blockBuffer, superBlock);
 
 	// allocating memory for list with information about each 
@@ -133,28 +131,32 @@ int main(int argc, char *argv[]){
 	// }
 	#endif
 	// reading inode table (inoded per block is 64)
-	readBlock(disk, 2, blockBuffer);
-	readInodeTable(disk, blockBuffer, superBlock);
+	readInodeTable(disk, superBlock);
+	readFreeBlocks(disk, superBlock);
 
 	#ifdef DEBUG
-	// for(int i = 0; i < 1000; i++){
-	// 	fprintf(stdout, "block[%d] = %d\n", i, (blockInfos + i)->file_occur);
-	// }
+	for(int i = 4900; i < 4999 ; i++){
+		fprintf(stdout, "block [%d] = [%d , %d]\n", i, (blockInfos + i)->file_occur, 
+		(blockInfos + i)->free_list_occur);
+	}
 	#endif
 
+	fclose(disk);
 	return 0;
 }
 
-
-void readInodeTable(FILE *disk, unsigned char *p, SuperBlock_Info *superBlock){
+void readInodeTable(FILE *disk, SuperBlock_Info *superBlock){
 	// iterating over inode blocks
+	unsigned char buffer[BLOCK_SIZE];
+	unsigned char *p = buffer;
+	// todo: implement check bootable partition!!!
+	// not bootable partition doesnt have bootblock
 	for(int i = 2; i < superBlock->isize + 2; i++){
 		readInodeBlock(disk, i, p);
 	}
 }
 
 void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
-	// inode can be read and checked
 	readBlock(disk, blockNum, p);
 
 	unsigned int mode;
@@ -166,7 +168,6 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 
   	for (i = 0; i < INOPB; i++) {
 		unsigned char *backup = p;
-		// todo: check mode != 0
     	mode = get4Bytes(p);
     	p += 4;
 		
@@ -184,7 +185,7 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 
 				// incrementing occurrece in files if block address not zero
 				if(addr > 0){
-					blockInfos[addr].file_occur = 1;
+					blockInfos[addr].file_occur++;
 				}
 			}
 			
@@ -193,7 +194,7 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 			p += 4;
 
 			if(addr > 0){
-				blockInfos[addr].file_occur = 1;
+				blockInfos[addr].file_occur++;
 				// reading indirect block
 				indirectBlock(disk, addr, SINGLE_INDIRECT);
 			}
@@ -202,7 +203,7 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 			p += 4;
 
 			if(addr > 0){
-				blockInfos[addr].file_occur = 1;
+				blockInfos[addr].file_occur++;
 				// reading double indirect block
 				indirectBlock(disk, addr, DOUBLE_INDIRECT);
 			}
@@ -226,7 +227,7 @@ void indirectBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char doubleIndir
 		p += 4;
 		
 		if(addr > 0){
-			blockInfos[addr].file_occur = 1;
+			blockInfos[addr].file_occur++;
 			if(doubleIndirect == DOUBLE_INDIRECT){
 				indirectBlock(disk, addr, SINGLE_INDIRECT);
 			}
@@ -236,6 +237,48 @@ void indirectBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char doubleIndir
 	}
 }
 
+void readFreeBlocks(FILE *disk, SuperBlock_Info *superBlock_Info){
+	EOS32_daddr_t freeBlksSize = superBlock_Info->nfree;
+	EOS32_daddr_t *freeList     = superBlock_Info->free_blocks;
+	// recursive traversal free blocks
+	freeBlock(disk, freeList, freeBlksSize);
+}
+
+void freeBlock(FILE *disk, EOS32_daddr_t *freeList, EOS32_daddr_t freeBlksSize){
+	unsigned char buffer[BLOCK_SIZE];
+	unsigned char *p = buffer;
+	EOS32_daddr_t addr;
+	unsigned int nfree;
+	EOS32_daddr_t *newFreeList;
+
+	for(int i = 0; i < NICFREE; i++){
+		if(i < freeBlksSize){
+			if(freeList[i] > 0 && i == 0){
+				readBlock(disk, freeList[i], p);
+				
+				nfree = get4Bytes(p);
+				p += 4;
+
+				newFreeList = malloc(sizeof(unsigned int) * nfree);
+				if(newFreeList == NULL){
+					exit(MEMORY_ALLOC_ERROR);
+				}
+
+				// recursive descent into (freeList[i])
+				for(int j = 0; j < NICFREE; j++){
+					addr = get4Bytes(p);
+					p += 4;
+					if(j < nfree){
+						*(newFreeList + j) = addr;
+					}  
+				}
+				freeBlock(disk, newFreeList, nfree);
+				free(newFreeList);
+			}
+			blockInfos[freeList[i]].free_list_occur++;
+		}
+	}	
+}
 
 void readSuperBlock(unsigned char *p, SuperBlock_Info *superBlock_Info) {
 	EOS32_daddr_t fsize;
@@ -263,7 +306,7 @@ void readSuperBlock(unsigned char *p, SuperBlock_Info *superBlock_Info) {
 	nfree = get4Bytes(p);
 	p += 4;
   	
-	unsigned int *freeBlocks;
+	EOS32_daddr_t *freeBlocks;
 	freeBlocks = malloc(sizeof(unsigned int) * nfree);
 	if(freeBlocks == NULL){
 		fprintf(stderr, "cannot allocate memory for free block list\n");
@@ -273,10 +316,10 @@ void readSuperBlock(unsigned char *p, SuperBlock_Info *superBlock_Info) {
   	for (i = 0; i < NICFREE; i++) {
 		free = get4Bytes(p);
 		p += 4;
-		if (i < nfree) {
+		if(i < nfree){
 			*(freeBlocks + i) = free;  
 		}
-  	}
+	}
 
 	superBlock_Info->nfree = nfree;
 	superBlock_Info->freeblks = freeblks;
