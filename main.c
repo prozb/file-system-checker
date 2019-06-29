@@ -137,9 +137,9 @@ int main(int argc, char *argv[]){
 	readInodeTable(disk, blockBuffer, superBlock);
 
 	#ifdef DEBUG
-	for(int i = 0; i < 1000; i++){
-		fprintf(stdout, "block[%d] = %d\n", i, (blockInfos + i)->file_occur);
-	}
+	// for(int i = 0; i < 1000; i++){
+	// 	fprintf(stdout, "block[%d] = %d\n", i, (blockInfos + i)->file_occur);
+	// }
 	#endif
 
 	return 0;
