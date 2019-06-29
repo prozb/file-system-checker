@@ -16,6 +16,9 @@
 // f) Erfolgloser Aufruf von malloc(): Exit-Code 6. 
 // g) Alle anderen Fehler: Exit-Code 9
 
+#define SINGLE_INDIRECT 0
+#define DOUBLE_INDIRECT 1
+
 #define SECTOR_SIZE	512	/* disk sector size in bytes */
 #define BLOCK_SIZE	4096	/* disk block size in bytes */
 #define NICFREE		500	/* maximum number of free blocks in superblock */
@@ -71,7 +74,7 @@ typedef struct Inode {
   	EOS32_daddr_t addr;
 } Inode;
 
-void indirectBlock(FILE *, EOS32_daddr_t);
+void indirectBlock(FILE *, EOS32_daddr_t, unsigned char);
 void readSuperBlock(unsigned char *, SuperBlock_Info *);
 void readInodeTable(FILE *, unsigned char *, SuperBlock_Info *);
 void readInodeBlock(FILE *disk, EOS32_daddr_t, unsigned char *);

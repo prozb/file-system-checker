@@ -195,7 +195,7 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 			if(addr > 0){
 				blockInfos[addr].file_occur = 1;
 				// reading indirect block
-				indirectBlock(disk, addr);
+				indirectBlock(disk, addr, SINGLE_INDIRECT);
 			}
 			// getting double indirect
 			addr = get4Bytes(p);
@@ -203,6 +203,8 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 
 			if(addr > 0){
 				blockInfos[addr].file_occur = 1;
+				// reading double indirect block
+				indirectBlock(disk, addr, DOUBLE_INDIRECT);
 			}
 		}else{
 			p += 32;
@@ -210,7 +212,7 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 	}
 }
 
-void indirectBlock(FILE *disk, EOS32_daddr_t blockNum) {
+void indirectBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char doubleIndirect) {
   	unsigned char buffer [BLOCK_SIZE];
 	unsigned char *p;
 	EOS32_daddr_t addr;
@@ -225,6 +227,9 @@ void indirectBlock(FILE *disk, EOS32_daddr_t blockNum) {
 		
 		if(addr > 0){
 			blockInfos[addr].file_occur = 1;
+			if(doubleIndirect == DOUBLE_INDIRECT){
+				indirectBlock(disk, addr, SINGLE_INDIRECT);
+			}
 		}else{
 			break;
 		}
