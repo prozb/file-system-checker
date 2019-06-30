@@ -14,9 +14,6 @@
  * */
 
 /* Exit-Codes ToDo:
-    Ein Block ist weder in einer Datei noch auf der Freiliste: Exit-Code 10.
-     Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
-    Ein Block ist mehr als einmal in der Freiliste: Exit-Code 12.
     Ein Block ist mehr als einmal in einer Datei oder in mehr als einer Datei: Exit-Code 13.
     Die Groesse einer Datei ist nicht konsistent mit den im Inode vermerkten Bloecken: Exit-Code 14.
     Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
@@ -42,6 +39,9 @@
     Illegale Partitionsnummer: Exit-Code 4.
     Partition enthaelt kein EOS32-Dateisystem: Exit-Code 5.
 
+	Ein Block ist weder in einer Datei noch auf der Freiliste: Exit-Code 10.
+	Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
+    Ein Block ist mehr als einmal in der Freiliste: Exit-Code 12.
     */
 
 static unsigned int fsStart;
