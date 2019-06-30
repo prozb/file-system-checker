@@ -133,16 +133,40 @@ int main(int argc, char *argv[]){
 	// reading inode table (inoded per block is 64)
 	readInodeTable(disk, superBlock);
 	readFreeBlocks(disk, superBlock);
+	checkBlockInfos(superBlock, blockInfos);
 
 	#ifdef DEBUG
-	for(int i = 4900; i < 4999 ; i++){
-		fprintf(stdout, "block [%d] = [%d , %d]\n", i, (blockInfos + i)->file_occur, 
-		(blockInfos + i)->free_list_occur);
-	}
+	// for(int i = 4900; i < 4999 ; i++){
+	// 	fprintf(stdout, "block [%d] = [%d , %d]\n", i, (blockInfos + i)->file_occur, 
+	// 	(blockInfos + i)->free_list_occur);
+	// }
 	#endif
 
 	fclose(disk);
 	return 0;
+}
+
+void checkBlockInfos(SuperBlock_Info *superBlock, Block_Info *blockInfos){
+	// skipping boot block, superblock and inode blocks
+	for(int i = superBlock->isize + 2; i < superBlock->fsize; i++){
+		// checking block is neither in file or in free list
+		if(blockInfos[i].file_occur == 0 &&
+		   blockInfos[i].free_list_occur == 0){
+			   fprintf(stderr, "block [%d] is neither in file or in free list\n", i);
+			   exit(NEITHER_IN_FILE_OR_FREELIST);
+		}
+
+		if(blockInfos[i].file_occur > 0 &&
+		   blockInfos[i].free_list_occur > 0){
+			   fprintf(stderr, "block [%d] is in file and in free list\n");
+			   exit(IN_FILE_IN_FREELIST);
+		}
+
+		if(blockInfos[i].free_list_occur > 1){
+			fprintf(stderr, "block [%d] has multiple occurrences in free list\n");
+			   exit(NEITHER_IN_FILE_OR_FREELIST);
+		}
+	}
 }
 
 void readInodeTable(FILE *disk, SuperBlock_Info *superBlock){

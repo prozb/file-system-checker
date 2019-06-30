@@ -16,6 +16,13 @@
 // f) Erfolgloser Aufruf von malloc(): Exit-Code 6. 
 // g) Alle anderen Fehler: Exit-Code 9
 
+// Ein Block ist weder in einer Datei noch auf der Freiliste: Exit-Code 10.
+// Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
+// Ein Block ist mehr als einmal in der Freiliste: Exit-Code 12.
+#define NEITHER_IN_FILE_OR_FREELIST 10
+#define IN_FILE_IN_FREELIST 11
+#define MULTIPLE_TIMES_FREELIST 12
+
 #define SINGLE_INDIRECT 0
 #define DOUBLE_INDIRECT 1
 
@@ -23,29 +30,15 @@
 #define BLOCK_SIZE	4096	/* disk block size in bytes */
 #define NICFREE		500	/* maximum number of free blocks in superblock */
 #define NICINOD		500	/* number of free inodes in superblock */
-
+#define IFMT		070000	/* type of file */
 #define INOPB		64	/* number of inodes per block */
 #define DIRPB		64	/* number of directory entries per block */
 #define DIRSIZ		60	/* max length of path name component */
 
-#define IFMT		070000	/* type of file */
-#define   IFREG		040000	/* regular file */
 #define   IFDIR		030000	/* directory */
 #define   IFCHR		020000	/* character special */
 #define   IFBLK		010000	/* block special */
-#define   IFFREE	000000	/* reserved (indicates free inode) */
-#define ISUID		004000	/* set user id on execution */
-#define ISGID		002000	/* set group id on execution */
-#define ISVTX		001000	/* save swapped text even after use */
-#define IUREAD		000400	/* user's read permission */
-#define IUWRITE		000200	/* user's write permission */
-#define IUEXEC		000100	/* user's execute permission */
-#define IGREAD		000040	/* group's read permission */
-#define IGWRITE		000020	/* group's write permission */
-#define IGEXEC		000010	/* group's execute permission */
-#define IOREAD		000004	/* other's read permission */
-#define IOWRITE		000002	/* other's write permission */
-#define IOEXEC		000001	/* other's execute permission */
+
 
 typedef unsigned int EOS32_ino_t;
 typedef unsigned int EOS32_daddr_t;
@@ -75,6 +68,7 @@ typedef struct Inode {
   	EOS32_daddr_t addr;
 } Inode;
 
+void checkBLockInfos(SuperBlock_Info *, Block_Info *);
 void indirectBlock(FILE *, EOS32_daddr_t, unsigned char);
 void freeBlock(FILE *, EOS32_daddr_t *, EOS32_daddr_t);
 void readFreeBlocks(FILE *, SuperBlock_Info *);
