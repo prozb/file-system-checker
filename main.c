@@ -9,19 +9,17 @@
 
 /* ToDo-Group:
  * David: Exit-Code 13, 15-19
- * Pavlo: Exit Code 10, 11, 12
- *
- * */
+ * Pavlo: recursive traversal over file system 
+*/
 
 /* Exit-Codes ToDo:
-    Ein Block ist mehr als einmal in einer Datei oder in mehr als einer Datei: Exit-Code 13.
     Die Groesse einer Datei ist nicht konsistent mit den im Inode vermerkten Bloecken: Exit-Code 14.
     Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
     Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
     Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
     Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18.
     Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
-     Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
+    Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
     Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
     Alle anderen Dateisystem-Fehler: Exit-Code 99.
     Alle anderen Fehler: Exit-Code 9.
@@ -42,7 +40,8 @@
 	Ein Block ist weder in einer Datei noch auf der Freiliste: Exit-Code 10.
 	Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
     Ein Block ist mehr als einmal in der Freiliste: Exit-Code 12.
-    */
+	Ein Block ist mehr als einmal in einer Datei oder in mehr als einer Datei: Exit-Code 13.
+*/
 
 static unsigned int fsStart;
 // information about all blocks in file system
@@ -169,19 +168,24 @@ void checkBlockInfos(SuperBlock_Info *superBlock, Block_Info *blockInfos){
 		// checking block is neither in file or in free list
 		if(blockInfos[i].file_occur == 0 &&
 		   blockInfos[i].free_list_occur == 0){
-			   fprintf(stderr, "block [%d] is neither in file or in free list\n", i);
-			   exit(NEITHER_IN_FILE_OR_FREELIST);
+			fprintf(stderr, "block [%d] is neither in file or in free list\n", i);
+			exit(NEITHER_IN_FILE_OR_FREELIST);
 		}
 
 		if(blockInfos[i].file_occur > 0 &&
 		   blockInfos[i].free_list_occur > 0){
-			   fprintf(stderr, "block [%d] is in file and in free list\n");
-			   exit(IN_FILE_IN_FREELIST);
+			fprintf(stderr, "block [%d] is in file and in free list\n");
+			exit(IN_FILE_IN_FREELIST);
 		}
 
 		if(blockInfos[i].free_list_occur > 1){
 			fprintf(stderr, "block [%d] has multiple occurrences in free list\n");
-			   exit(NEITHER_IN_FILE_OR_FREELIST);
+			exit(NEITHER_IN_FILE_OR_FREELIST);
+		}
+
+		if(blockInfos[i].file_occur > 1){
+			fprintf(stderr, "block [%d] has multiple occurrences files\n");
+			exit(BLOCK_DUPLICATE_DATA);
 		}
 	}
 }
