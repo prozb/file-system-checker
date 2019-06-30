@@ -10,6 +10,9 @@
 /* ToDo-Group:
  * David: Exit-Code 13, 15-19
  * Pavlo: recursive traversal over file system 
+ * Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
+ * Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18. 
+
 */
 
 /* Exit-Codes ToDo:
@@ -19,7 +22,6 @@
     Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
     Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18.
     Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
-    Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
     Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
     Alle anderen Dateisystem-Fehler: Exit-Code 99.
     Alle anderen Fehler: Exit-Code 9.
@@ -46,7 +48,10 @@
 static unsigned int fsStart;
 // information about all blocks in file system
 static Block_Info *blockInfos; 
-unsigned int fsStart;
+// information about all inodes in file system
+static Inode_Info *inodeInfos;
+// file system start position
+static unsigned int fsStart;
 
 #define DEBUG
 
@@ -140,6 +145,13 @@ int main(int argc, char *argv[]){
 		fprintf(stderr, "cannot allocate memory for list with information about each system block\n");
 		exit(MEMORY_ALLOC_ERROR);
 	}
+
+	// allocating memory for inode information
+	inodeInfos = malloc(superBlock->isize * INOPB);
+	if(inodeInfos == NULL){
+		fprintf(stderr, "cannot allocate memory for list with information about each inode\n");
+		exit(MEMORY_ALLOC_ERROR);
+	}
 	
 	#ifdef DEBUG
 	// for(int i = 0; i < superBlock->nfree; i++){
@@ -150,6 +162,8 @@ int main(int argc, char *argv[]){
 	readInodeTable(disk, superBlock);
 	readFreeBlocks(disk, superBlock);
 	checkBlockInfos(superBlock, blockInfos);
+	// recursive reading system files
+	readSystemFiles(disk, superBlock);
 
 	#ifdef DEBUG
 	// for(int i = 4900; i < 4999 ; i++){
@@ -194,16 +208,64 @@ void readInodeTable(FILE *disk, SuperBlock_Info *superBlock){
 	// iterating over inode blocks
 	unsigned char buffer[BLOCK_SIZE];
 	unsigned char *p = buffer;
-	// todo: implement check bootable partition!!!
-	// not bootable partition doesnt have bootblock
+
 	for(int i = 2; i < superBlock->isize + 2; i++){
 		readInodeBlock(disk, i, p);
 	}
 }
 
-void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
-	readBlock(disk, blockNum, p);
+void readSystemFiles(FILE *disk, SuperBlock_Info *superBlock){
+	Inode *inode;
+	unsigned char buffer [BLOCK_SIZE];
+	unsigned char *p = buffer;
+	// reading root inode block
+	readBlock(disk, 2, p);
+	inode = malloc(sizeof(unsigned int) * 2 + 
+						  sizeof(EOS32_off_t));
+	// iterating over file system blocks
+	if(inode == NULL){
+		fprintf(stderr, "cannot allocate memory for inode\n");
+		exit(MEMORY_ALLOC_ERROR);
+	}
+	p += 64; // jump to root inode
+	readInode(p, inode);
+	
+	if(isDir(inode)){
+		// step into recursion
+	}else{
+		// throw exception if root inode is not dir
+		exit(ROOT_INODE_NOT_DIR);
+	}
+	free(inode);
+}
 
+int isDir(Inode *inode){
+	if((inode->mode & IFMT) == IFDIR){
+		return 1;
+	}
+	return 0;
+}
+
+void readInode(unsigned char *p, Inode *node){
+	unsigned int _mode;
+  	unsigned int _nlink;
+  	EOS32_off_t _size;
+	  
+	_mode = get4Bytes(p);
+	p += 4;
+		
+	_nlink = get4Bytes(p);
+	p += 24;
+
+	_size = get4Bytes(p);
+	p += 4;
+
+	node->mode 	= _mode;
+	node->nlink = _nlink;
+	node->size  = _size;
+}
+
+void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 	unsigned int mode;
   	unsigned int nlink;
   	EOS32_off_t size;
@@ -211,6 +273,7 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 
   	int i, j;
 
+	readBlock(disk, blockNum, p);
   	for (i = 0; i < INOPB; i++) {
 		unsigned char *backup = p;
     	mode = get4Bytes(p);

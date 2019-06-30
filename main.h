@@ -20,13 +20,13 @@
 #define INODE_LINK_COUNT_APPEARANCE_FALSE 17
 #define INODE_TYPE_FIELD_INVALID 18
 #define INODE_FREE_IN_DIR 19
-#define ROOT_INODE_NO_DIR 20
+#define ROOT_INODE_NOT_DIR 20
 #define DIR_CANNOT_BE_REACHED_FROM_ROOT 21
 #define UNDEFINED_FILE_SYSTEM_ERROR 99
 
 /* Exit-Codes ToDo:
     Ein Block ist weder in einer Datei noch auf der Freiliste: Exit-Code 10.
-     Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
+    Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
     Ein Block ist mehr als einmal in der Freiliste: Exit-Code 12.
     Ein Block ist mehr als einmal in einer Datei oder in mehr als einer Datei: Exit-Code 13.
     Die Groesse einer Datei ist nicht konsistent mit den im Inode vermerkten Bloecken: Exit-Code 14.
@@ -82,28 +82,39 @@ typedef unsigned int EOS32_off_t;
 typedef int EOS32_time_t;
 
 typedef struct Block_Info {
-    unsigned int file_occur;
-    unsigned int free_list_occur;
+    unsigned int file_occur;      // block occurrences in files 
+    unsigned int free_list_occur; // block occurrences in free list 
 } Block_Info;
 
-typedef struct SuperBlock_Info {
-    EOS32_daddr_t fsize; // file system size in blocks
-	EOS32_daddr_t isize; // inode list size
-	EOS32_daddr_t freeblks; // free blocks size
-	EOS32_ino_t freeinos; // free inodes size
-
-    unsigned int nfree; // number of entries in free block
-    EOS32_daddr_t *free_blocks;
-} SuperBlock_Info;
+typedef struct Inode_Info{
+    unsigned int link_count;      // inode occurrence calculated 
+    unsigned int link_actual;     // inode occurrence actual information
+} Inode_Info;
 
 typedef struct Inode {
-    unsigned int mode;
-  	unsigned int nlink;
+    unsigned int mode;            // inode mode 
+  	unsigned int nlink;           // num of links to node 
 
-  	EOS32_off_t size;
-  	EOS32_daddr_t addr;
+  	EOS32_off_t size;             // size of inode  
+  	// EOS32_daddr_t addr;           // 
 } Inode;
 
+typedef struct SuperBlock_Info {
+    EOS32_daddr_t fsize;          // file system size in blocks
+	EOS32_daddr_t isize;          // inode list size
+	EOS32_daddr_t freeblks;       // free blocks size
+	EOS32_ino_t freeinos;         // free inodes size
+    EOS32_daddr_t *free_blocks;   // list with free blocks 
+
+    unsigned int nfree;           // number of entries in free block list
+} SuperBlock_Info;
+
+// checking inode directory
+int isDir(Inode *);
+unsigned int get4Bytes(unsigned char *);
+void readInode(unsigned char *, Inode *);
+void readSystemFiles(FILE *, SuperBlock_Info *);
+void visitNode(FILE *, EOS32_daddr_t , EOS32_daddr_t );
 void checkBLockInfos(SuperBlock_Info *, Block_Info *);
 void indirectBlock(FILE *, EOS32_daddr_t, unsigned char);
 void freeBlock(FILE *, EOS32_daddr_t *, EOS32_daddr_t);
@@ -112,4 +123,3 @@ void readSuperBlock(unsigned char *, SuperBlock_Info *);
 void readInodeTable(FILE *, SuperBlock_Info *);
 void readInodeBlock(FILE *disk, EOS32_daddr_t, unsigned char *);
 void readBlock(FILE *, EOS32_daddr_t, unsigned char *);
-unsigned int get4Bytes(unsigned char *);
