@@ -7,8 +7,8 @@
 #include <errno.h>
 #include "main.h"
 
-/* ToDo-Gruppe:
- * David: Alle Exit Codes in den Header, David-Branch übertragen auf Master, Exit-Code 13, 15-19
+/* ToDo-Group:
+ * David: Exit-Code 13, 15-19
  * Pavlo: Exit Code 10, 11, 12
  *
  * */
@@ -47,6 +47,8 @@
 static unsigned int fsStart;
 // information about all blocks in file system
 static Block_Info *blockInfos; 
+unsigned int fsStart;
+
 #define DEBUG
 
 int main(int argc, char *argv[]){
@@ -56,10 +58,12 @@ int main(int argc, char *argv[]){
 	EOS32_daddr_t freeList[NICFREE];
 	unsigned char partTable[SECTOR_SIZE];
 	unsigned char blockBuffer[BLOCK_SIZE];
+    unsigned char *blockPointer;
 	unsigned char *ptptr;
 	unsigned int fsSize;
 	unsigned int partType;
 	unsigned int freeListSize;
+    unsigned int numBlocks;
 	int part;
 
 	SuperBlock_Info *superBlock;
@@ -110,9 +114,22 @@ int main(int argc, char *argv[]){
             part, argv[1]);
 		exit(NO_FILE_SYSTEM);
     }
+
     fsStart = get4Bytes(ptptr + 4);
     fsSize = get4Bytes(ptptr + 8);
-	
+
+    if (fsSize % SPB != 0) {
+        fprintf(stderr, "The File system size is not a multiple of block size.\n");
+        exit(UNDEFINED_FILE_SYSTEM_ERROR); // ToDo, is Exit-Code 99 correct?
+    }
+    numBlocks = fsSize / SPB;
+    printf("This equals %u (0x%X) blocks of %d bytes each.\n",
+           numBlocks, numBlocks, BLOCK_SIZE);
+    if (numBlocks < 2) {
+        fprintf(stderr, "The File system has less than 2 blocks");
+        exit(UNDEFINED_FILE_SYSTEM_ERROR); // Exit-Code Number 99
+    }
+
 	// reading superblock and allocating free list 
 	readBlock(disk, 1, blockBuffer);
 	readSuperBlock(blockBuffer, superBlock);

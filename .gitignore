@@ -2,13 +2,14 @@
 bin/
 .vscode/
 main
-<<<<<<< HEAD
 disk*.img
-=======
+eosfiles/*.out
+# dont commit binaries
+eosfiles/shpart
+eosfiles/shfs
+
+
 \.idea/
-
 CMakeLists\.txt
-
 cmake-build-debug
 
->>>>>>> 5f3cbbe7cbed4818d196617ca0ff3897aeb94c88
