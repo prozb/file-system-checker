@@ -24,37 +24,6 @@
 #define DIR_CANNOT_BE_REACHED_FROM_ROOT 21
 #define UNDEFINED_FILE_SYSTEM_ERROR 99
 
-/* Exit-Codes ToDo:
-    Ein Block ist weder in einer Datei noch auf der Freiliste: Exit-Code 10.
-    Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
-    Ein Block ist mehr als einmal in der Freiliste: Exit-Code 12.
-    Ein Block ist mehr als einmal in einer Datei oder in mehr als einer Datei: Exit-Code 13.
-    Die Groesse einer Datei ist nicht konsistent mit den im Inode vermerkten Bloecken: Exit-Code 14.
-    Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
-    Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
-    Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
-    Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18.
-    Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
-     Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
-    Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
-    Alle anderen Dateisystem-Fehler: Exit-Code 99.
-    Alle anderen Fehler: Exit-Code 9.
-*/
-
-/* Exit-Codes pending
-    Erfolgloser Aufruf von malloc(): Exit-Code 6.
-    */
-
-
-/* Exit-Codes DONE
-    Falscher Aufruf des Programms: Exit-Code 1.
-    Image-Datei nicht gefunden: Exit-Code 2.
-    Datei Ein/Ausgabefehler: Exit-Code 3.
-    Illegale Partitionsnummer: Exit-Code 4.
-    Partition enthaelt kein EOS32-Dateisystem: Exit-Code 5.
-
-    */
-
 #define SINGLE_INDIRECT 0
 #define DOUBLE_INDIRECT 1
 
@@ -71,10 +40,13 @@
 #define DIRPB		64	/* number of directory entries per block */
 #define DIRSIZ		60	/* max length of path name component */
 
-#define   IFDIR		030000	/* directory */
-#define   IFCHR		020000	/* character special */
-#define   IFBLK		010000	/* block special */
-
+#define IFDIR		030000	/* directory */
+#define IFCHR		020000	/* character special */
+#define IFBLK		010000	/* block special */
+#define INODE_BLOCKS_COUNT 8 /* count of block refs in inode */  
+#define IFMT		070000	/* type of file */
+#define IFREG		040000	/* regular file */
+#define IFFREE	000000	/* reserved (indicates free inode) */
 
 typedef unsigned int EOS32_ino_t;
 typedef unsigned int EOS32_daddr_t;
@@ -92,11 +64,11 @@ typedef struct Inode_Info{
 } Inode_Info;
 
 typedef struct Inode {
-    unsigned int mode;            // inode mode 
-  	unsigned int nlink;           // num of links to node 
+    unsigned int mode;                      // inode mode 
+  	unsigned int nlink;                     // num of links to node 
 
-  	EOS32_off_t size;             // size of inode  
-  	// EOS32_daddr_t addr;           // 
+  	EOS32_off_t size;                       // size of inode  
+  	EOS32_daddr_t *refs;                    // addresses to blocks
 } Inode;
 
 typedef struct SuperBlock_Info {
@@ -111,7 +83,10 @@ typedef struct SuperBlock_Info {
 
 // checking inode directory
 int isDir(Inode *);
+int checkIllegalType(unsigned int);
 unsigned int get4Bytes(unsigned char *);
+void readInode2(FILE *, Inode *, unsigned int);
+// reading inode by number 
 void readInode(unsigned char *, Inode *);
 void readSystemFiles(FILE *, SuperBlock_Info *);
 void visitNode(FILE *, EOS32_daddr_t , EOS32_daddr_t );

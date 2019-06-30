@@ -10,7 +10,6 @@
 /* ToDo-Group:
  * David: Exit-Code 13, 15-19
  * Pavlo: recursive traversal over file system 
- * Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
  * Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18. 
 
 */
@@ -20,7 +19,6 @@
     Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
     Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
     Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
-    Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18.
     Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
     Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
     Alle anderen Dateisystem-Fehler: Exit-Code 99.
@@ -29,7 +27,7 @@
 
 /* Exit-Codes pending
     Erfolgloser Aufruf von malloc(): Exit-Code 6.
-    */
+*/
 
 
 /* Exit-Codes DONE
@@ -43,6 +41,7 @@
 	Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
     Ein Block ist mehr als einmal in der Freiliste: Exit-Code 12.
 	Ein Block ist mehr als einmal in einer Datei oder in mehr als einer Datei: Exit-Code 13.
+	Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
 */
 
 static unsigned int fsStart;
@@ -127,8 +126,8 @@ int main(int argc, char *argv[]){
         exit(UNDEFINED_FILE_SYSTEM_ERROR); // ToDo, is Exit-Code 99 correct?
     }
     numBlocks = fsSize / SPB;
-    printf("This equals %u (0x%X) blocks of %d bytes each.\n",
-           numBlocks, numBlocks, BLOCK_SIZE);
+    // printf("This equals %u (0x%X) blocks of %d bytes each.\n",
+    //        numBlocks, numBlocks, BLOCK_SIZE);
     if (numBlocks < 2) {
         fprintf(stderr, "The File system has less than 2 blocks");
         exit(UNDEFINED_FILE_SYSTEM_ERROR); // Exit-Code Number 99
@@ -220,8 +219,7 @@ void readSystemFiles(FILE *disk, SuperBlock_Info *superBlock){
 	unsigned char *p = buffer;
 	// reading root inode block
 	readBlock(disk, 2, p);
-	inode = malloc(sizeof(unsigned int) * 2 + 
-						  sizeof(EOS32_off_t));
+	inode = malloc(sizeof(Inode));
 	// iterating over file system blocks
 	if(inode == NULL){
 		fprintf(stderr, "cannot allocate memory for inode\n");
@@ -232,11 +230,40 @@ void readSystemFiles(FILE *disk, SuperBlock_Info *superBlock){
 	
 	if(isDir(inode)){
 		// step into recursion
+		EOS32_daddr_t *refs = inode->refs;
+		for(int i = 0; i < INODE_BLOCKS_COUNT; i++){
+			if(*(refs + i) == 0){
+				// directory does not have more directories 
+				break;
+			}
+			// handling simple cases with direct blocks
+			if(i < 6){
+				visitNode(disk, *(refs + i), 1);
+			}else {
+				//todo: handling single and double indirection
+			}
+		}
 	}else{
 		// throw exception if root inode is not dir
 		exit(ROOT_INODE_NOT_DIR);
 	}
 	free(inode);
+}
+
+void visitNode(FILE *disk, EOS32_daddr_t currentNode, EOS32_daddr_t parentNode){
+	Inode *inode;
+
+	inode = malloc(sizeof(Inode));
+	if(inode == NULL){
+		exit(MEMORY_ALLOC_ERROR);
+	}
+
+	readInode2(disk, inode, currentNode);
+	// checking mode of inode
+	if(checkIllegalType(inode->mode) != 1){
+		fprintf(stderr, "invalid inode: \"%d\" type\n", inode->mode);
+		exit(INODE_TYPE_FIELD_INVALID);
+	}
 }
 
 int isDir(Inode *inode){
@@ -246,11 +273,38 @@ int isDir(Inode *inode){
 	return 0;
 }
 
+int checkIllegalType(unsigned int mode){
+	if ((mode & IFMT) == IFREG ||
+	    (mode & IFMT) == IFDIR ||
+		(mode & IFMT) == IFCHR || 
+		(mode & IFMT) == IFBLK){
+		
+		return 1;
+	}
+	return 0;
+}
+
+void readInode2(FILE *disk, Inode *node, unsigned int inoNum){
+	unsigned char buffer[BLOCK_SIZE];
+	unsigned char *p = buffer;
+	
+	unsigned int blockNum = inoNum / INOPB + 2;
+	unsigned int position = inoNum % INOPB;
+	// reading block with current inode 
+	readBlock(disk, blockNum, p);
+	// move pointer to inode
+	p += INOPB * position;
+	// reading inode
+	readInode(p, node);	
+}
+
 void readInode(unsigned char *p, Inode *node){
 	unsigned int _mode;
   	unsigned int _nlink;
   	EOS32_off_t _size;
-	  
+	EOS32_daddr_t _addr;
+	EOS32_daddr_t _refs [INODE_BLOCKS_COUNT];
+
 	_mode = get4Bytes(p);
 	p += 4;
 		
@@ -263,6 +317,28 @@ void readInode(unsigned char *p, Inode *node){
 	node->mode 	= _mode;
 	node->nlink = _nlink;
 	node->size  = _size;
+	node->refs  = _refs;
+	// reading addresses
+	// skipping handling blocks of character and block devices
+	if (((_mode & IFMT) != IFCHR) && ((_mode & IFMT) != IFBLK)) {
+		for (int j = 0; j < 6; j++) {
+			// iterating over direct blocks
+			_addr = get4Bytes(p);
+			p += 4;
+
+			_refs[j] = _addr;
+		}
+		
+		// getting single indirect
+		_addr	 = get4Bytes(p);
+		_refs[6] = _addr;
+
+		p += 4;
+		
+		// getting double indirect
+		_addr = get4Bytes(p);
+		_refs[7] = _addr;
+	}
 }
 
 void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
@@ -275,7 +351,6 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 
 	readBlock(disk, blockNum, p);
   	for (i = 0; i < INOPB; i++) {
-		unsigned char *backup = p;
     	mode = get4Bytes(p);
     	p += 4;
 		
