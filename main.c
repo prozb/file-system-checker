@@ -146,7 +146,7 @@ int main(int argc, char *argv[]){
 	}
 
 	// allocating memory for inode information
-	inodeInfos = malloc(superBlock->isize * INOPB);
+	inodeInfos = malloc(INOPB * superBlock->isize * sizeof(Inode_Info));
 	if(inodeInfos == NULL){
 		fprintf(stderr, "cannot allocate memory for list with information about each inode\n");
 		exit(MEMORY_ALLOC_ERROR);
@@ -288,6 +288,7 @@ void stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum){
 		// is not directory
 		inodeInfos[inodeNum].link_count = 1;
 	}
+	free(refs);
 }
 
 void stepIntoDirectoryBlock(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t currentDirBlock){
