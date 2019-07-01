@@ -10,8 +10,6 @@
 /* ToDo-Group:
  * David: Exit-Code 13, 15-19
  * Pavlo: recursive traversal over file system 
- * Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18. 
-
 */
 
 /* Exit-Codes ToDo:
@@ -42,6 +40,8 @@
     Ein Block ist mehr als einmal in der Freiliste: Exit-Code 12.
 	Ein Block ist mehr als einmal in einer Datei oder in mehr als einer Datei: Exit-Code 13.
 	Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
+	Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18. 
+
 */
 
 static unsigned int fsStart;
@@ -215,56 +215,111 @@ void readInodeTable(FILE *disk, SuperBlock_Info *superBlock){
 
 void readSystemFiles(FILE *disk, SuperBlock_Info *superBlock){
 	Inode *inode;
-	unsigned char buffer [BLOCK_SIZE];
-	unsigned char *p = buffer;
-	// reading root inode block
-	readBlock(disk, 2, p);
 	inode = malloc(sizeof(Inode));
 	// iterating over file system blocks
 	if(inode == NULL){
 		fprintf(stderr, "cannot allocate memory for inode\n");
 		exit(MEMORY_ALLOC_ERROR);
 	}
-	p += 64; // jump to root inode
-	readInode(p, inode);
-	
-	if(isDir(inode)){
-		// step into recursion
-		EOS32_daddr_t *refs = inode->refs;
+	// start from root inode
+	readInode2(disk, inode, 1);
+	if(!isDir(inode)){
+		// throw exception if root inode is not dir
+		exit(ROOT_INODE_NOT_DIR);
+	}
+	free(inode);
+	// steping into root inode
+	stepIntoInode(disk, 1);
+}
+
+void stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum){
+	Inode *inode;
+	inode = malloc(sizeof(Inode));
+	EOS32_daddr_t *refs;
+	// iterating over file system blocks
+	if(inode == NULL){
+		fprintf(stderr, "cannot allocate memory for inode\n");
+		exit(MEMORY_ALLOC_ERROR);
+	}
+	// start from root inode
+	readInode2(disk, inode, inodeNum);
+
+	if(!isDir(inode) && inodeNum == 1){
+		// throw exception if root inode is not dir
+		exit(ROOT_INODE_NOT_DIR);
+	}
+	// checking invalid type
+	if(!checkIllegalType(inode->mode)){
+		exit(INODE_TYPE_FIELD_INVALID);
+	}
+
+	// traversal inode if directory
+	if(isDir(inode)){	
+		refs = inode->refs;
+		free(inode);
+		// recursive descent into all directory blocks of current directory
 		for(int i = 0; i < INODE_BLOCKS_COUNT; i++){
-			if(*(refs + i) == 0){
-				// directory does not have more directories 
+			if(refs[i] == 0){
+				// directory does not contain more directories 
 				break;
 			}
 			// handling simple cases with direct blocks
 			if(i < 6){
-				visitNode(disk, *(refs + i), 1);
+				stepIntoDirectoryBlock(disk, inodeNum, refs[i]);
 			}else {
 				//todo: handling single and double indirection
 			}
 		}
 	}else{
-		// throw exception if root inode is not dir
-		exit(ROOT_INODE_NOT_DIR);
-	}
-	free(inode);
-}
-
-void visitNode(FILE *disk, EOS32_daddr_t currentNode, EOS32_daddr_t parentNode){
-	Inode *inode;
-
-	inode = malloc(sizeof(Inode));
-	if(inode == NULL){
-		exit(MEMORY_ALLOC_ERROR);
-	}
-
-	readInode2(disk, inode, currentNode);
-	// checking mode of inode
-	if(checkIllegalType(inode->mode) != 1){
-		fprintf(stderr, "invalid inode: \"%d\" type\n", inode->mode);
-		exit(INODE_TYPE_FIELD_INVALID);
+		// is not directory
 	}
 }
+
+void stepIntoDirectoryBlock(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t currentDirBlock){
+	// todo: count num of files
+	EOS32_ino_t ino;
+  	int i, j;
+	unsigned int linksCount;
+	unsigned char buffer[BLOCK_SIZE];
+	unsigned char *p = buffer;
+
+	readBlock(disk, currentDirBlock, p);
+	for (i = 0; i < DIRPB; i++) {
+		if(i > 1){
+			// getting inode number 
+			ino = get4Bytes(p);
+			// step into 
+			if(ino != inodeNum){
+				stepIntoInode(disk, ino);
+			}
+			if(ino == 0){
+				linksCount = i;
+				// no more inodes in this directory
+				break;
+			}
+		}
+		// move pointer to next dir
+		p += DIRSIZ + 4;
+	}
+	// calculated links = i - 1 (".")  
+	inodeInfos[inodeNum].link_count = linksCount;
+}
+
+// void visitNode(FILE *disk, EOS32_daddr_t currentNode, EOS32_daddr_t parentNode){
+// 	Inode *inode;
+
+// 	inode = malloc(sizeof(Inode));
+// 	if(inode == NULL){
+// 		exit(MEMORY_ALLOC_ERROR);
+// 	}
+
+// 	readInode2(disk, inode, currentNode);
+// 	// checking mode of inode
+// 	if(checkIllegalType(inode->mode) != 1){
+// 		fprintf(stderr, "invalid inode: \"%d\" type\n", inode->mode);
+// 		exit(INODE_TYPE_FIELD_INVALID);
+// 	}
+// }
 
 int isDir(Inode *inode){
 	if((inode->mode & IFMT) == IFDIR){

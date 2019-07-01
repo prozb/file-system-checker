@@ -60,7 +60,6 @@ typedef struct Block_Info {
 
 typedef struct Inode_Info{
     unsigned int link_count;      // inode occurrence calculated 
-    unsigned int link_actual;     // inode occurrence actual information
 } Inode_Info;
 
 typedef struct Inode {
@@ -85,12 +84,14 @@ typedef struct SuperBlock_Info {
 int isDir(Inode *);
 int checkIllegalType(unsigned int);
 unsigned int get4Bytes(unsigned char *);
+void stepIntoInode(FILE *, EOS32_daddr_t);
+void stepIntoDirectoryBlock(FILE *, EOS32_daddr_t, EOS32_daddr_t);
 void readInode2(FILE *, Inode *, unsigned int);
 // reading inode by number 
 void readInode(unsigned char *, Inode *);
 void readSystemFiles(FILE *, SuperBlock_Info *);
 void visitNode(FILE *, EOS32_daddr_t , EOS32_daddr_t );
-void checkBLockInfos(SuperBlock_Info *, Block_Info *);
+void checkBlockInfos(SuperBlock_Info *, Block_Info *);
 void indirectBlock(FILE *, EOS32_daddr_t, unsigned char);
 void freeBlock(FILE *, EOS32_daddr_t *, EOS32_daddr_t);
 void readFreeBlocks(FILE *, SuperBlock_Info *);
