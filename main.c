@@ -169,6 +169,10 @@ int main(int argc, char *argv[]){
 	// 	fprintf(stdout, "block [%d] = [%d , %d]\n", i, (blockInfos + i)->file_occur, 
 	// 	(blockInfos + i)->free_list_occur);
 	// }
+
+	for(int i = 0; i < superBlock->isize * INOPB; i++){
+		fprintf(stdout, "indode[%d] = %d\n", i, inodeInfos[i].link_count);
+	}
 	#endif
 
 	fclose(disk);
@@ -233,14 +237,21 @@ void readSystemFiles(FILE *disk, SuperBlock_Info *superBlock){
 }
 
 void stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum){
+	EOS32_daddr_t *refs;
 	Inode *inode;
 	inode = malloc(sizeof(Inode));
-	EOS32_daddr_t *refs;
 	// iterating over file system blocks
 	if(inode == NULL){
 		fprintf(stderr, "cannot allocate memory for inode\n");
 		exit(MEMORY_ALLOC_ERROR);
 	}
+
+	refs = malloc(sizeof(EOS32_daddr_t) * 8);
+	if(refs == NULL){
+		fprintf(stderr, "cannot allocate memory for inode\n");
+		exit(MEMORY_ALLOC_ERROR);
+	}
+
 	// start from root inode
 	readInode2(disk, inode, inodeNum);
 
@@ -255,7 +266,10 @@ void stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum){
 
 	// traversal inode if directory
 	if(isDir(inode)){	
-		refs = inode->refs;
+		// todo: copy pointers
+		for(int i = 0; i < 8; i++){
+			refs[i] = inode->refs[i];
+		}
 		free(inode);
 		// recursive descent into all directory blocks of current directory
 		for(int i = 0; i < INODE_BLOCKS_COUNT; i++){
@@ -272,6 +286,7 @@ void stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum){
 		}
 	}else{
 		// is not directory
+		inodeInfos[inodeNum].link_count = 1;
 	}
 }
 
@@ -288,10 +303,12 @@ void stepIntoDirectoryBlock(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t cu
 		if(i > 1){
 			// getting inode number 
 			ino = get4Bytes(p);
+			
 			// step into 
-			if(ino != inodeNum){
+			if(ino != inodeNum && ino != 0){
 				stepIntoInode(disk, ino);
 			}
+
 			if(ino == 0){
 				linksCount = i;
 				// no more inodes in this directory
@@ -302,24 +319,8 @@ void stepIntoDirectoryBlock(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t cu
 		p += DIRSIZ + 4;
 	}
 	// calculated links = i - 1 (".")  
-	inodeInfos[inodeNum].link_count = linksCount;
+	inodeInfos[inodeNum].link_count += linksCount;
 }
-
-// void visitNode(FILE *disk, EOS32_daddr_t currentNode, EOS32_daddr_t parentNode){
-// 	Inode *inode;
-
-// 	inode = malloc(sizeof(Inode));
-// 	if(inode == NULL){
-// 		exit(MEMORY_ALLOC_ERROR);
-// 	}
-
-// 	readInode2(disk, inode, currentNode);
-// 	// checking mode of inode
-// 	if(checkIllegalType(inode->mode) != 1){
-// 		fprintf(stderr, "invalid inode: \"%d\" type\n", inode->mode);
-// 		exit(INODE_TYPE_FIELD_INVALID);
-// 	}
-// }
 
 int isDir(Inode *inode){
 	if((inode->mode & IFMT) == IFDIR){
