@@ -27,10 +27,6 @@
 
 /* Exit-Codes pending
     Erfolgloser Aufruf von malloc(): Exit-Code 6.
-	Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
-    Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
-    Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
-    Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
 */
 
 
@@ -47,7 +43,10 @@
 	Ein Block ist mehr als einmal in einer Datei oder in mehr als einer Datei: Exit-Code 13.
 	Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
 	Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18. 
-
+	Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
+	Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
+	Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
+	Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
 */
 
 static unsigned int fsStart;
@@ -157,12 +156,7 @@ int main(int argc, char *argv[]){
 		fprintf(stderr, "cannot allocate memory for list with information about each inode\n");
 		exit(MEMORY_ALLOC_ERROR);
 	}
-	
-	#ifdef DEBUG
-	// for(int i = 0; i < superBlock->nfree; i++){
-	// 	fprintf(stdout, "free block[%d] = %d\n", i, superBlock->free_blocks[i]);
-	// }
-	#endif
+
 	// reading inode table (inoded per block is 64)
 	readInodeTable(disk, superBlock);
 	readFreeBlocks(disk, superBlock);
@@ -177,9 +171,9 @@ int main(int argc, char *argv[]){
 	// 	(blockInfos + i)->free_list_occur);
 	// }
 
-	for(int i = 0; i < superBlock->isize * INOPB; i++){
-		fprintf(stdout, "indode[%d] = %d\n", i, inodeInfos[i].link_count);
-	}
+	// for(int i = 0; i < superBlock->isize * INOPB; i++){
+	// 	fprintf(stdout, "indode[%d] = %d\n", i, inodeInfos[i].link_count);
+	// }
 	#endif
 
 	fclose(disk);
@@ -198,6 +192,24 @@ void checkInodeErrors(FILE *disk, Inode_Info *inodeInfos, SuperBlock_Info *super
 		if(inodeInfos[i].link_count == 0 && inode->mode != 0){
 			fprintf(stderr, "inode [%d] with link count 0 is not free\n", i);
 			exit(INODE_LINK_COUNT_NULL_NOT_FREE);
+		}
+		// Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
+		if(inodeInfos[i].link_count != 0 && (inodeInfos[i].link_count != inode->nlink)){
+			fprintf(stderr, "inode [%d] with link count %d is not exactly in %d directories\n", i,
+			inode->nlink, inodeInfos[i].link_count);
+
+			exit(INODE_LINK_COUNT_APPEARANCE_FALSE);
+		}
+		// Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
+		if(inodeInfos[i].link_count == 0 && inode->nlink > 0){
+			fprintf(stderr, "inode [%d] with link count 0 is in %d directories", i, inode->nlink);
+			exit(INODE_LINK_COUNT_NULL_IN_DIR);
+		}
+
+		// Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
+		if(inode->nlink > 0 && inodeInfos[i].link_count == 0){
+			fprintf(stderr, "inode [%d] should be free but is in directory\n", i);
+			exit(INODE_FREE_IN_DIR);			
 		}
 	}
 }
