@@ -81,7 +81,7 @@ int isDir(Inode *);
 int checkIllegalType(unsigned int);
 unsigned int get4Bytes(unsigned char *);
 void checkInodeErrors(FILE *, Inode_Info *, SuperBlock_Info *);
-void stepIntoInode(FILE *, EOS32_daddr_t, EOS32_daddr_t);
+unsigned char stepIntoInode(FILE *, EOS32_daddr_t, EOS32_daddr_t);
 void stepIntoDirectoryBlock(FILE *, EOS32_daddr_t, EOS32_daddr_t, EOS32_daddr_t);
 void readInode2(FILE *, Inode *, unsigned int);
 void readInode(unsigned char *, Inode *);

@@ -14,7 +14,7 @@
 
 /* ToDo-Group:
  * David: Exit-Code 13, 15-19
- * Pavlo: recursive traversal over file system 
+ * Pavlo: 
 */
 
 /* Exit-Codes ToDo:
@@ -259,7 +259,7 @@ void readSystemFiles(FILE *disk, SuperBlock_Info *superBlock){
 	stepIntoInode(disk, 1, 0);
 }
 
-void stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t parentInode){
+unsigned char stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t parentInode){
 	EOS32_daddr_t *refs;
 	Inode *inode;
 	inode = malloc(sizeof(Inode));
@@ -303,14 +303,17 @@ void stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t parentInode
 				stepIntoDirectoryBlock(disk, parentInode, inodeNum, refs[i]);
 			}else {
 				//todo: handling single and double indirection
-				printf("\n");
 			}
 		}
+	free(refs);
 	}else{
+		free(refs);
 		// is not directory
 		inodeInfos[inodeNum].link_count = 1;
+
+		return 0;
 	}
-	free(refs);
+	return 1; // directory
 }
 
 void stepIntoDirectoryBlock(FILE *disk, EOS32_daddr_t parentInode,
@@ -318,9 +321,10 @@ void stepIntoDirectoryBlock(FILE *disk, EOS32_daddr_t parentInode,
 	// todo: count num of files
 	EOS32_ino_t ino;
   	int i, j;
-	unsigned int linksCount;
+	unsigned int linksCount = 0;
 	unsigned char buffer[BLOCK_SIZE];
 	unsigned char *p = buffer;
+	unsigned char dirFlag;
 
 	readBlock(disk, currentDirBlock, p);
 	for (i = 0; i < DIRPB; i++) {
@@ -329,10 +333,16 @@ void stepIntoDirectoryBlock(FILE *disk, EOS32_daddr_t parentInode,
 		
 		// step into inode if its not current inode, zero inode or parent
 		if(ino != inodeNum && ino != 0 && ino != parentInode){
-			stepIntoInode(disk, ino, inodeNum);
+			dirFlag = stepIntoInode(disk, ino, inodeNum);
+			// count directories
+			if(dirFlag){
+				linksCount++;
+			}
+		}else if((ino == inodeNum || ino == parentInode) && ino != 0){
+			// count links to parent and current inode as well
+			linksCount++;
 		}
-		linksCount = i;
-
+		
 		if(ino == 0){
 			// no more inodes in this directory
 			break;
