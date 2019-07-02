@@ -7,16 +7,13 @@
 #define NO_FILE_SYSTEM 5
 #define MEMORY_ALLOC_ERROR 6
 #define RANDOM_ERROR 9
-// Ein Block ist weder in einer Datei noch auf der Freiliste: Exit-Code 10.
-// Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
-// Ein Block ist mehr als einmal in der Freiliste: Exit-Code 12.
 #define NEITHER_IN_FILE_OR_FREELIST 10
 #define IN_FILE_IN_FREELIST 11
 #define MULTIPLE_TIMES_FREELIST 12
 #define BLOCK_DUPLICATE_DATA 13
 #define DATA_SIZE_INCONSISTENT 14
 #define INODE_LINK_COUNT_NULL_IN_DIR 15
-#define INODE_LINK_COUNT_NULL_NOT_EMPTY 16
+#define INODE_LINK_COUNT_NULL_NOT_FREE 16
 #define INODE_LINK_COUNT_APPEARANCE_FALSE 17
 #define INODE_TYPE_FIELD_INVALID 18
 #define INODE_FREE_IN_DIR 19
@@ -80,14 +77,13 @@ typedef struct SuperBlock_Info {
     unsigned int nfree;           // number of entries in free block list
 } SuperBlock_Info;
 
-// checking inode directory
 int isDir(Inode *);
 int checkIllegalType(unsigned int);
 unsigned int get4Bytes(unsigned char *);
-void stepIntoInode(FILE *, EOS32_daddr_t);
-void stepIntoDirectoryBlock(FILE *, EOS32_daddr_t, EOS32_daddr_t);
+void checkInodeErrors(FILE *, Inode_Info *, SuperBlock_Info *);
+void stepIntoInode(FILE *, EOS32_daddr_t, EOS32_daddr_t);
+void stepIntoDirectoryBlock(FILE *, EOS32_daddr_t, EOS32_daddr_t, EOS32_daddr_t);
 void readInode2(FILE *, Inode *, unsigned int);
-// reading inode by number 
 void readInode(unsigned char *, Inode *);
 void readSystemFiles(FILE *, SuperBlock_Info *);
 void visitNode(FILE *, EOS32_daddr_t , EOS32_daddr_t );

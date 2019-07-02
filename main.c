@@ -1,3 +1,8 @@
+/***************************************
+ *     EOS32 File System Checker	   *
+ *	   @version 1.0.0				   *
+ *	   @author Pavlo Rozbytskyi		   *
+ ***************************************/
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
@@ -14,10 +19,7 @@
 
 /* Exit-Codes ToDo:
     Die Groesse einer Datei ist nicht konsistent mit den im Inode vermerkten Bloecken: Exit-Code 14.
-    Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
-    Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
-    Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
-    Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
+    
     Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
     Alle anderen Dateisystem-Fehler: Exit-Code 99.
     Alle anderen Fehler: Exit-Code 9.
@@ -25,6 +27,10 @@
 
 /* Exit-Codes pending
     Erfolgloser Aufruf von malloc(): Exit-Code 6.
+	Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
+    Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
+    Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
+    Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
 */
 
 
@@ -163,7 +169,8 @@ int main(int argc, char *argv[]){
 	checkBlockInfos(superBlock, blockInfos);
 	// recursive reading system files
 	readSystemFiles(disk, superBlock);
-
+	// handling inode errors
+	checkInodeErrors(disk, inodeInfos, superBlock);
 	#ifdef DEBUG
 	// for(int i = 4900; i < 4999 ; i++){
 	// 	fprintf(stdout, "block [%d] = [%d , %d]\n", i, (blockInfos + i)->file_occur, 
@@ -177,6 +184,22 @@ int main(int argc, char *argv[]){
 
 	fclose(disk);
 	return 0;
+}
+
+void checkInodeErrors(FILE *disk, Inode_Info *inodeInfos, SuperBlock_Info *superBlock){
+	Inode *inode;
+	inode = malloc(sizeof(Inode));
+	if(inode == NULL){
+		exit(MEMORY_ALLOC_ERROR);
+	}
+	for(int i = 1; i < superBlock->isize * INOPB; i++){
+		readInode2(disk, inode, i);
+		// Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
+		if(inodeInfos[i].link_count == 0 && inode->mode != 0){
+			fprintf(stderr, "inode [%d] with link count 0 is not free\n", i);
+			exit(INODE_LINK_COUNT_NULL_NOT_FREE);
+		}
+	}
 }
 
 void checkBlockInfos(SuperBlock_Info *superBlock, Block_Info *blockInfos){
@@ -233,10 +256,10 @@ void readSystemFiles(FILE *disk, SuperBlock_Info *superBlock){
 	}
 	free(inode);
 	// steping into root inode
-	stepIntoInode(disk, 1);
+	stepIntoInode(disk, 1, 0);
 }
 
-void stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum){
+void stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t parentInode){
 	EOS32_daddr_t *refs;
 	Inode *inode;
 	inode = malloc(sizeof(Inode));
@@ -251,10 +274,8 @@ void stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum){
 		fprintf(stderr, "cannot allocate memory for inode\n");
 		exit(MEMORY_ALLOC_ERROR);
 	}
-
-	// start from root inode
 	readInode2(disk, inode, inodeNum);
-
+	
 	if(!isDir(inode) && inodeNum == 1){
 		// throw exception if root inode is not dir
 		exit(ROOT_INODE_NOT_DIR);
@@ -279,9 +300,10 @@ void stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum){
 			}
 			// handling simple cases with direct blocks
 			if(i < 6){
-				stepIntoDirectoryBlock(disk, inodeNum, refs[i]);
+				stepIntoDirectoryBlock(disk, parentInode, inodeNum, refs[i]);
 			}else {
 				//todo: handling single and double indirection
+				printf("\n");
 			}
 		}
 	}else{
@@ -291,7 +313,8 @@ void stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum){
 	free(refs);
 }
 
-void stepIntoDirectoryBlock(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t currentDirBlock){
+void stepIntoDirectoryBlock(FILE *disk, EOS32_daddr_t parentInode,
+				 EOS32_daddr_t inodeNum, EOS32_daddr_t currentDirBlock){
 	// todo: count num of files
 	EOS32_ino_t ino;
   	int i, j;
@@ -301,20 +324,18 @@ void stepIntoDirectoryBlock(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t cu
 
 	readBlock(disk, currentDirBlock, p);
 	for (i = 0; i < DIRPB; i++) {
-		if(i > 1){
-			// getting inode number 
-			ino = get4Bytes(p);
-			
-			// step into 
-			if(ino != inodeNum && ino != 0){
-				stepIntoInode(disk, ino);
-			}
+		// getting inode number 
+		ino = get4Bytes(p);
+		
+		// step into inode if its not current inode, zero inode or parent
+		if(ino != inodeNum && ino != 0 && ino != parentInode){
+			stepIntoInode(disk, ino, inodeNum);
+		}
+		linksCount = i;
 
-			if(ino == 0){
-				linksCount = i;
-				// no more inodes in this directory
-				break;
-			}
+		if(ino == 0){
+			// no more inodes in this directory
+			break;
 		}
 		// move pointer to next dir
 		p += DIRSIZ + 4;
