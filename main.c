@@ -165,16 +165,6 @@ int main(int argc, char *argv[]){
 	readSystemFiles(disk, superBlock);
 	// handling inode errors
 	checkInodeErrors(disk, inodeInfos, superBlock);
-	#ifdef DEBUG
-	// for(int i = 4900; i < 4999 ; i++){
-	// 	fprintf(stdout, "block [%d] = [%d , %d]\n", i, (blockInfos + i)->file_occur, 
-	// 	(blockInfos + i)->free_list_occur);
-	// }
-
-	// for(int i = 0; i < superBlock->isize * INOPB; i++){
-	// 	fprintf(stdout, "indode[%d] = %d\n", i, inodeInfos[i].link_count);
-	// }
-	#endif
 
 	fclose(disk);
 	return 0;
