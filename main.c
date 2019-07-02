@@ -13,6 +13,8 @@
 #include <errno.h>
 #include "main.h"
 
+// ToDo: David Exit Code 14 (Deadline 03.07)
+
 /* Exit-Codes ToDo:
     Die Groesse einer Datei ist nicht konsistent mit den im Inode vermerkten Bloecken: Exit-Code 14.
     Alle anderen Dateisystem-Fehler: Exit-Code 99.
