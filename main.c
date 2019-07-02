@@ -1,71 +1,20 @@
-// ----- Logik -----
-/* - Ausführen eines Filesytem-Check auf der Partitionsnummer
- * - Erkennen von Fehlersituationen im Dateisystem
- * - Ausgabe von Fehlermeldung bei auftreten einer Fehlersituation und abbruch mit entsprechendem EXIT-Code
- * - Prinzipiell sind zu ueberpruefen: Bloecke, Dateien (d.h. Inodes), Verzeichnisse.
- */
-
-// --------- HINWEISE --------
-/*
-    1. Sie duerfen die Hilfsfunktionen zum Lesen des Dateisystems aus den Programmen "shpart" und "EOS32-shfs" verwenden, ohne sich dem Vorwurf eines Plagiats auszusetzen.
-    2. Den Startsektor der in der Kommandozeile angegebenen Partition entnehmen Sie der Partitionstabelle der Platte. Pruefen Sie, ob eine Partition angegeben wurde, auf der sich auch tatsaechlich ein EOS32-Dateisystem befindet!
-    3. Ueberlegen Sie sich Datenstrukturen, um moeglichst effizient viele der o.a. Fehlersituationen in moeglichst wenigen Durchgaengen zu entdecken. Vorschlag (den Sie unbedingt aufgreifen sollten):
-    a) (fuer Bloecke) Tabelle mit zwei Zaehlern pro Block; einer zaehlt Vorkommen in Dateien, der andere Vorkommen in der Freiliste. Es wird ein Durchgang durch alle Inodes gemacht, anschliessend die Freiliste inspiziert. Am Ende muss jeder Block genau eine "1" in einem der beiden Zaehlern haben.
-    b) (fuer Verzeichnisse) Tabelle mit einem Zaehler pro Inode. Es wird ein rekursiver Durchgang durch alle Verzeichnisse gemacht und dabei die Anzahl der Referenzen auf jede Datei gezaehlt. Am Ende wird mit einem Durchgang durch die Inodes geprueft, ob der Linkcount in den Inodes stimmt.
-    4. Die Idee, die gesamte Platte in Datenstrukturen in den Hauptspeicher zu laden und danach den Dateisystem-Check dort durchzufuehren, ist angesichts der Groesse moderner Platten undurchfuehrbar. Denken Sie daran, dass die Dateisysteme, mit denen die Akzeptanztests fuer Ihre Hausuebung durchgefuehrt werden, ganz andere Groessen haben koennen als das im Praktikum benutzte Dateisystem. Das gilt sowohl fuer die Gesamtanzahl der Bloecke als auch fuer die Anzahl der Inode-Bloecke (und natuerlich auch fuer die auf der Platte gespeicherten Dateien).
-    5. Achten Sie auf Character- und Block-Special-Files! Deren "Blocknummer" fuer den ersten direkten Block ist keine reale Blocknummer, sondern die Haupt/Neben-Geraetenummer, die den Treiber fuer dieses Geraet auswaehlt.
-    6. Testen Sie Ihr Programm gruendlich, indem Sie gezielt Bytes (bzw. Halbworte oder Worte) im Disk-Image "umschiessen". Sie koennen dazu dieses Programm benutzen.
- */
-
-
 #include <stdio.h>
-#include <string.h>
+#include <unistd.h>
+#include <errno.h>
 #include <stdlib.h>
-#include <stdarg.h>
+#include <time.h>
+#include <math.h>
+#include <errno.h>
+#include "main.h"
 
-#define SECTOR_SIZE    512    /* disk sector size in bytes */
-#define BLOCK_SIZE    4096    /* disk block size in bytes */
-#define SPB        (BLOCK_SIZE / SECTOR_SIZE)
-#define LINE_SIZE    100    /* input line buffer size in bytes */
-#define LINES_PER_BATCH    32    /* number of lines output in one batch */
-
-#define NICINOD        500    /* number of free inodes in superblock */
-#define NICFREE        500    /* number of free blocks in superblock */
-#define INOPB        64    /* number of inodes per block */
-#define DIRPB        64    /* number of directory entries per block */
-#define DIRSIZ        60    /* max length of path name component */
-
-#define IFMT        070000    /* type of file */
-#define   IFREG        040000    /* regular file */
-#define   IFDIR        030000    /* directory */
-#define   IFCHR        020000    /* character special */
-#define   IFBLK        010000    /* block special */
-#define   IFFREE    000000    /* reserved (indicates free inode) */
-#define ISUID        004000    /* set user id on execution */
-#define ISGID        002000    /* set group id on execution */
-#define ISVTX        001000    /* save swapped text even after use */
-#define IUREAD        000400    /* user's read permission */
-#define IUWRITE        000200    /* user's write permission */
-#define IUEXEC        000100    /* user's execute permission */
-#define IGREAD        000040    /* group's read permission */
-#define IGWRITE        000020    /* group's write permission */
-#define IGEXEC        000010    /* group's execute permission */
-#define IOREAD        000004    /* other's read permission */
-#define IOWRITE        000002    /* other's write permission */
-#define IOEXEC        000001    /* other's execute permission */
+/* ToDo-Group:
+ * David: set mode and nlink for inodes
+ * Pavlo: recursive traversal over file system 
+*/
 
 /* Exit-Codes ToDo:
-    Ein Block ist weder in einer Datei noch auf der Freiliste: Exit-Code 10.
-     Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
-    Ein Block ist mehr als einmal in der Freiliste: Exit-Code 12.
-    Ein Block ist mehr als einmal in einer Datei oder in mehr als einer Datei: Exit-Code 13.
     Die Groesse einer Datei ist nicht konsistent mit den im Inode vermerkten Bloecken: Exit-Code 14.
-    Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
-    Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
-    Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
-    Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18.
-    Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
-     Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
+    Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
     Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
     Alle anderen Dateisystem-Fehler: Exit-Code 99.
     Alle anderen Fehler: Exit-Code 9.
@@ -82,38 +31,432 @@
     Datei Ein/Ausgabefehler: Exit-Code 3.
     Illegale Partitionsnummer: Exit-Code 4.
     Partition enthaelt kein EOS32-Dateisystem: Exit-Code 5.
+	Ein Block ist weder in einer Datei noch auf der Freiliste: Exit-Code 10.
+	Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
+    Ein Block ist mehr als einmal in der Freiliste: Exit-Code 12.
+	Ein Block ist mehr als einmal in einer Datei oder in mehr als einer Datei: Exit-Code 13.
+    Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
+    Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
+    Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
+    Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18.
+    Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
+*/
 
-    */
+static unsigned int fsStart;
+// information about all blocks in file system
+static Block_Info *blockInfos;
+static Inode *inodeInfos;
+unsigned char partTable[SECTOR_SIZE];
+unsigned char blockBuffer[BLOCK_SIZE];
 
-typedef struct {
-// Todo
-} Inode;
+#define DEBUG
 
-typedef struct {
-// ToDo
-} Block;
+int main(int argc, char *argv[]) {
+    FILE *disk;
 
-unsigned int fsStart;
-Inode *inodeTable;
-Block *blockTable;
-typedef unsigned int EOS32_ino_t;
-typedef unsigned int EOS32_daddr_t;
-typedef unsigned int EOS32_off_t;
-typedef int EOS32_time_t;
-EOS32_off_t inodeSize;
+    // free blocks list (need to check that files are not in this list)
+    EOS32_daddr_t freeList[NICFREE];
+    unsigned char *blockPointer;
+    unsigned char *ptptr;
+    unsigned int fsSize;
+    unsigned int partType;
+    unsigned int freeListSize;
+    unsigned int numBlocks;
+    int part;
 
-/*
- * Format-Function for Error-Messages
- */
-void error(char *fmt, ...) {
-    va_list ap;
+    SuperBlock_Info *superBlock;
+    superBlock = malloc(sizeof(EOS32_daddr_t) * 3 +
+                        sizeof(EOS32_ino_t) +
+                        sizeof(unsigned int) +
+                        sizeof(unsigned int *));
 
-    va_start(ap, fmt);
-    printf("Error: ");
-    vprintf(fmt, ap);
-    printf("\n");
-    va_end(ap);
-    exit(1);
+    if (superBlock == NULL) {
+        fprintf(stderr, "cannot allocate memory for superblock\n");
+        exit(MEMORY_ALLOC_ERROR);
+    }
+
+    if (argc < 3) {
+        fprintf(stderr, "incorrect program: \"%s\" start\n", argv[1]);
+        exit(INCORRECT_START);
+    }
+
+    if (access(argv[1], F_OK) == -1) {
+        fprintf(stderr, "file \"%s\" does not exist", argv[1]);
+        exit(IMAGE_NOT_FOUND);
+    }
+
+    disk = fopen(argv[1], "rb");
+    if (disk == NULL) {
+        fprintf(stderr, "cannot open disk image file '%s', %d", argv[1], errno);
+        exit(IO_ERROR);
+    }
+
+    char *endptr;
+    /* argv[2] is partition number of file system */
+    part = strtoul(argv[2], &endptr, 10); // parsing number 
+    if (*endptr != '\0' || part < 0 || part > 15) {
+        fprintf(stderr, "illegal partition number '%s'", argv[2]);
+        exit(ILLEGAL_PARTITION);
+    }
+    // setting file pointer to partition table
+    fseek(disk, 1 * SECTOR_SIZE, SEEK_SET);
+    if (fread(partTable, 1, SECTOR_SIZE, disk) != SECTOR_SIZE) {
+        fprintf(stderr, "cannot read partition table of disk '%s'", argv[1]);
+        exit(IO_ERROR);
+    }
+    // pointer to needed partition
+    ptptr = partTable + part * 32;
+    partType = get4Bytes(ptptr + 0);
+    if ((partType & 0x7FFFFFFF) != 0x00000058) {
+        fprintf(stderr, "partition %d of disk '%s' does not contain an EOS32 file system",
+                part, argv[1]);
+        exit(NO_FILE_SYSTEM);
+    }
+
+    fsStart = get4Bytes(ptptr + 4);
+    fsSize = get4Bytes(ptptr + 8);
+
+    if (fsSize % SPB != 0) {
+        fprintf(stderr, "The File system size is not a multiple of block size.\n");
+        exit(UNDEFINED_FILE_SYSTEM_ERROR); // ToDo, is Exit-Code 99 correct?
+    }
+    numBlocks = fsSize / SPB;
+    printf("This equals %u (0x%X) blocks of %d bytes each.\n",
+           numBlocks, numBlocks, BLOCK_SIZE);
+    if (numBlocks < 2) {
+        fprintf(stderr, "The File system has less than 2 blocks");
+        exit(UNDEFINED_FILE_SYSTEM_ERROR); // Exit-Code Number 99
+    }
+
+    // reading superblock and allocating free list
+    readBlock(disk, 1, blockBuffer);
+    readSuperBlock(blockBuffer, superBlock);
+
+    // allocating memory for list with information about each
+    // memory block in the system
+    blockInfos = malloc(superBlock->fsize * sizeof(unsigned int) * 2);
+    if (blockInfos == NULL) {
+        fprintf(stderr, "cannot allocate memory for list with information about each system block\n");
+        exit(MEMORY_ALLOC_ERROR);
+    }
+    ptptr += 8;
+    inodeInfos->size = get4Bytes(ptptr);
+    // allocating memory for inode blocks in the system
+    inodeInfos = malloc(inodeInfos->size * sizeof(Inode) * INOPB);
+    if(inodeInfos == NULL){
+        fprintf(stderr, "cannot allocate memory for list with information about each system block\n");
+        exit(MEMORY_ALLOC_ERROR);
+    }
+
+#ifdef DEBUG
+    // for(int i = 0; i < superBlock->nfree; i++){
+    // 	fprintf(stdout, "free block[%d] = %d\n", i, superBlock->free_blocks[i]);
+    // }
+#endif
+    // reading inode table (inode per block is 64)
+    readInodeTable(disk, superBlock);
+    readFreeBlocks(disk, superBlock);
+    checkBlockInfos(superBlock, blockInfos);
+    checkInodeTable(disk, superBlock, inodeInfos);
+
+#ifdef DEBUG
+    // for(int i = 4900; i < 4999 ; i++){
+    // 	fprintf(stdout, "block [%d] = [%d , %d]\n", i, (blockInfos + i)->file_occur,
+    // 	(blockInfos + i)->free_list_occur);
+    // }
+#endif
+    printf("File check completed successfully");
+    fclose(disk);
+    return 0;
+}
+
+void checkInodeTable(FILE* disk, SuperBlock_Info *superBlock, Inode *pInode) {
+    unsigned char buffer[BLOCK_SIZE];
+    unsigned char *buff = buffer;
+    // skipping boot block and superblock
+    for (int pointer = superBlock->isize + 2; pointer < superBlock->fsize; pointer++) {
+        readInodeBlock(disk, pointer, buff);
+        buff = blockBuffer;
+        // iterate trough all the Inodes inside the Block (64)
+        for (int i = 0; i < INOPB; i++) {
+            // set the inodeID to the current Inode inside the Block
+            pInode->inodeID = (i + (pointer * INOPB));
+            unsigned int mode;
+            unsigned int nlink;
+
+            // check if the current InodeID is not zero (free)
+            if (pInode[i].inodeID != 0) {
+                // allocate the Inode mode
+                mode = get4Bytes(buff);
+                buff += 4;
+                if (mode != 0) {
+                    // allocates the inode Type of the current Inode
+                    unsigned int inodeType = mode & IFMT;
+                    if (inodeType != IFREG && inodeType != IFDIR && inodeType != IFCHR && inodeType != IFBLK) {
+                        fprintf(stderr, "Illegal inodeType value 0x%08X \n", i);
+                        exit(INODE_TYPE_FIELD_INVALID);
+                    }
+                    // checks if the inode Type of the inode is a directory
+                    if (inodeType == IFDIR && pInode[i].mode == 0) {
+                        fprintf(stderr, "The Inode %d is a directory, but cannot be reached from the root \n", pInode->inodeID);
+                        exit(DIR_CANNOT_BE_REACHED_FROM_ROOT);
+                    }
+                    // ToDo: fix condition, why is this always true???
+                } else if (mode == 0 && pInode[i].mode == 1) {
+                    fprintf(stderr, "The Inode %d appears in a directory but is free\n", pInode->inodeID);
+                    exit(INODE_FREE_IN_DIR);
+                }
+                // allocate the Inode-Link counter
+                nlink = get4Bytes(buff);
+                buff += 4;
+
+                if (nlink == 0) {
+                    if (mode != 0) {
+                        fprintf(stderr, "The Inode %d has a Linkcount of 0 but it is not free \n", pInode->inodeID);
+                        exit(INODE_LINK_COUNT_NULL_NOT_EMPTY);
+                    }
+                    if (pInode[i].nlink != 0) {
+                        fprintf(stderr, "The Inode %u has Linkcount of 0 but it appears in a directory %u times \n", pInode->inodeID, pInode[i].nlink);
+                        exit(INODE_LINK_COUNT_NULL_IN_DIR);
+                    }
+                }
+
+                if (nlink != pInode[i].nlink) {
+                    fprintf(stderr, "The Linkcount is %d but the Inode %d appears %d times in directory \n", nlink, pInode->inodeID, pInode[i].nlink);
+                    exit(INODE_LINK_COUNT_APPEARANCE_FALSE);
+                }
+                // set the pointer to 64 which is the end of a block (4+4+56)
+                buff += 56;
+                // else: the InodeID is zero, or all 64 Inodes have been inspected.
+            } else {
+                buff += 64;
+            }
+        }
+    }
+
+
+}
+
+void checkBlockInfos(SuperBlock_Info *superBlock, Block_Info *blockInfo) {
+    // skipping boot block, superblock and inode blocks
+    for (int i = superBlock->isize + 2; i < superBlock->fsize; i++) {
+        // checking block is neither in file or in free list
+        if (blockInfo[i].file_occur == 0 &&
+            blockInfo[i].free_list_occur == 0) {
+            fprintf(stderr, "block [%d] is neither in file or in free list\n", i);
+            exit(NEITHER_IN_FILE_OR_FREELIST);
+        }
+
+        if (blockInfo[i].file_occur > 0 &&
+            blockInfo[i].free_list_occur > 0) {
+            fprintf(stderr, "block [%d] is in file and in free list\n", i);
+            exit(IN_FILE_IN_FREELIST);
+        }
+
+        if (blockInfo[i].free_list_occur > 1) {
+            fprintf(stderr, "block [%d] has multiple occurrences in free list\n", i);
+            exit(NEITHER_IN_FILE_OR_FREELIST);
+        }
+
+        if (blockInfo[i].file_occur > 1) {
+            fprintf(stderr, "block [%d] has multiple occurrences files\n", i);
+            exit(BLOCK_DUPLICATE_DATA);
+        }
+    }
+}
+
+void readInodeTable(FILE *disk, SuperBlock_Info *superBlock) {
+    // iterating over inode blocks
+    unsigned char buffer[BLOCK_SIZE];
+    unsigned char *p = buffer;
+    // todo: implement check bootable partition!!!
+    // not bootable partition doesnt have bootblock
+    for(int i = 2; i < superBlock->isize + 2; i++){
+        readInodeBlock(disk, i, p);
+    }
+}
+
+void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p) {
+    readBlock(disk, blockNum, p);
+
+    unsigned int mode;
+    unsigned int nlink;
+    EOS32_off_t size;
+    EOS32_daddr_t addr;
+
+    int i, j;
+
+    for (i = 0; i < INOPB; i++) {
+        unsigned char *backup = p;
+        mode = get4Bytes(p);
+        p += 4;
+
+        nlink = get4Bytes(p);
+        p += 24;
+
+        size = get4Bytes(p);
+        p += 4;
+        // skipping handling blocks of character and block devices
+        if (((mode & IFMT) != IFCHR) && ((mode & IFMT) != IFBLK)) {
+            for (j = 0; j < 6; j++) {
+                // iterating over direct blocks
+                addr = get4Bytes(p);
+                p += 4;
+
+                // incrementing occurrence in files if block address not zero
+                if (addr > 0) {
+                    blockInfos[addr].file_occur++;
+                }
+            }
+
+            // getting single indirect
+            addr = get4Bytes(p);
+            p += 4;
+
+            if (addr > 0) {
+                blockInfos[addr].file_occur++;
+                // reading indirect block
+                indirectBlock(disk, addr, SINGLE_INDIRECT);
+            }
+            // getting double indirect
+            addr = get4Bytes(p);
+            p += 4;
+
+            if (addr > 0) {
+                blockInfos[addr].file_occur++;
+                // reading double indirect block
+                indirectBlock(disk, addr, DOUBLE_INDIRECT);
+            }
+        } else {
+            p += 32;
+        }
+    }
+}
+
+void indirectBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char doubleIndirect) {
+    unsigned char buffer[BLOCK_SIZE];
+    unsigned char *p;
+    EOS32_daddr_t addr;
+    int i;
+
+    p = buffer;
+
+    readBlock(disk, blockNum, buffer);
+    for (i = 0; i < BLOCK_SIZE / sizeof(EOS32_daddr_t); i++) {
+        addr = get4Bytes(p);
+        p += 4;
+
+        if (addr > 0) {
+            blockInfos[addr].file_occur++;
+            if (doubleIndirect == DOUBLE_INDIRECT) {
+                indirectBlock(disk, addr, SINGLE_INDIRECT);
+            }
+        } else {
+            break;
+        }
+    }
+}
+
+void readFreeBlocks(FILE *disk, SuperBlock_Info *superBlock_Info) {
+    EOS32_daddr_t freeBlksSize = superBlock_Info->nfree;
+    EOS32_daddr_t *freeList = superBlock_Info->free_blocks;
+    // recursive traversal free blocks
+    freeBlock(disk, freeList, freeBlksSize);
+}
+
+void freeBlock(FILE *disk, EOS32_daddr_t *freeList, EOS32_daddr_t freeBlksSize) {
+    unsigned char buffer[BLOCK_SIZE];
+    unsigned char *p = buffer;
+    EOS32_daddr_t addr;
+    unsigned int nfree;
+    EOS32_daddr_t *newFreeList;
+
+    for (int i = 0; i < NICFREE; i++) {
+        if (i < freeBlksSize) {
+            if (freeList[i] > 0 && i == 0) {
+                readBlock(disk, freeList[i], p);
+
+                nfree = get4Bytes(p);
+                p += 4;
+
+                newFreeList = malloc(sizeof(unsigned int) * nfree);
+                if (newFreeList == NULL) {
+                    exit(MEMORY_ALLOC_ERROR);
+                }
+
+                // recursive descent into (freeList[i])
+                for (int j = 0; j < NICFREE; j++) {
+                    addr = get4Bytes(p);
+                    p += 4;
+                    if (j < nfree) {
+                        *(newFreeList + j) = addr;
+                    }
+                }
+                freeBlock(disk, newFreeList, nfree);
+                free(newFreeList);
+            }
+            blockInfos[freeList[i]].free_list_occur++;
+        }
+    }
+}
+
+void readSuperBlock(unsigned char *p, SuperBlock_Info *superBlock_Info) {
+    EOS32_daddr_t fsize;
+    EOS32_daddr_t isize;
+    EOS32_daddr_t freeblks;
+    EOS32_ino_t freeinos;
+    EOS32_daddr_t free;
+    unsigned int nfree;
+    int i;
+
+    p += 4;
+    fsize = get4Bytes(p);
+    p += 4;
+    isize = get4Bytes(p);
+    p += 4;
+    freeblks = get4Bytes(p);
+    p += 4;
+    freeinos = get4Bytes(p);
+
+    p += 8;
+    for (i = 0; i < NICINOD; i++) {
+        p += 4;
+    }
+
+    nfree = get4Bytes(p);
+    p += 4;
+
+    EOS32_daddr_t *freeBlocks;
+    freeBlocks = malloc(sizeof(unsigned int) * nfree);
+    if (freeBlocks == NULL) {
+        fprintf(stderr, "cannot allocate memory for free block list\n");
+        exit(MEMORY_ALLOC_ERROR);
+    }
+
+    for (i = 0; i < NICFREE; i++) {
+        free = get4Bytes(p);
+        p += 4;
+        if (i < nfree) {
+            *(freeBlocks + i) = free;
+        }
+    }
+
+    superBlock_Info->nfree = nfree;
+    superBlock_Info->freeblks = freeblks;
+    superBlock_Info->freeinos = freeinos;
+    superBlock_Info->fsize = fsize;
+    superBlock_Info->isize = isize;
+    superBlock_Info->free_blocks = freeBlocks;
+}
+
+
+void readBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *blockBuffer) {
+    fseek(disk, fsStart * SECTOR_SIZE + blockNum * BLOCK_SIZE, SEEK_SET);
+
+    if (fread(blockBuffer, BLOCK_SIZE, 1, disk) != 1) {
+        fprintf(stderr, "cannot read block %lu (0x%lX)", blockNum, blockNum);
+        exit(IO_ERROR);
+    }
 }
 
 unsigned int get4Bytes(unsigned char *addr) {
@@ -121,103 +464,4 @@ unsigned int get4Bytes(unsigned char *addr) {
            (unsigned int) addr[1] << 16 |
            (unsigned int) addr[2] << 8 |
            (unsigned int) addr[3] << 0;
-}
-
-void readBlock(FILE *disk,
-               EOS32_daddr_t blockNum,
-               unsigned char *blockBuffer) {
-    fseek(disk, fsStart * SECTOR_SIZE + blockNum * BLOCK_SIZE, SEEK_SET);
-    if (fread(blockBuffer, BLOCK_SIZE, 1, disk) != 1) {
-        error("cannot read block %lu (0x%lX)", blockNum, blockNum);
-        exit(3); // Exit-Code Number 3
-    }
-}
-
-int main(int argc, char *argv[]) {
-    char *filename;
-    char *endptr;
-    unsigned char *blockPointer;
-    unsigned char *ptptr;
-    unsigned int fsSize;
-    unsigned int partType;
-    unsigned int numBlocks;
-    unsigned char partTable[SECTOR_SIZE];
-    unsigned char blockBuffer[BLOCK_SIZE];
-    //char eos[] = "PLACEHOLDER";
-    //char partition[] = "PLACEHOLDER";
-    FILE *disk = NULL;
-    int partition;
-
-    /* Stops the Shell if there is no input */
-    if (argc == 1) {
-        printf("Usage: ./hu2 <EOS-IMG-FILE> [partition-number]\n");
-        exit(1); // Exit-Code Number 1
-
-    }
-    /* Checks if the input is a valid disk image */
-    disk = fopen(argv[0], "rb");
-    if (disk == NULL) {
-        error("cannot open disk image file '%s'", argv[1]);
-    }
-        /* Interprets the disk image and partition number */
-    else if (argc == 2) {
-        filename = argv[1];
-        partition = (strtoul(argv[2], &endptr, 10));
-        if (*endptr != '\0' || partition < 0 || partition > 15) {
-            error("illegal partition number '%s'", argv[2]);
-            exit(4); // Exit-Code Number 4
-        }
-        disk = fopen(filename, "rb");
-        if (disk == NULL) {
-            error("cannot find disk image %s\n", argv[1]);
-            exit(2); // Exit-Code Number 2
-        }
-        /* reads the partition table */
-        fseek(disk, 1 * SECTOR_SIZE, SEEK_SET);
-        if (fread(partTable, 1, SECTOR_SIZE, disk) != SECTOR_SIZE) {
-            error("cannot read partition table of disk '%s'", argv[1]);
-            exit(3); // Exit-Code Number 3
-        }
-        /* checks if the parition table contains a EOS32 file system */
-        ptptr = partTable + partition * 32;
-        partType = get4Bytes(ptptr + 0);
-        if ((partType & 0x7FFFFFFF) != 0x00000058) {
-            error("The partition %d of disk '%s' does not contain an EOS32 file system", partition, argv[1]);
-            exit(5); // Exit-Code Number 5
-        }
-        /* determines the start of the file system and its size */
-        fsStart = get4Bytes(ptptr + 4);
-        fsSize = get4Bytes(ptptr + 8);
-
-        /* printf("The File system has size %u (0x%X) sectors of %d bytes each.\n",
-               fsSize, fsSize, SECTOR_SIZE); */
-
-        if (fsSize % SPB != 0) {
-            error("The File system size is not a multiple of block size.\n");
-            exit(99); // ToDo, is Exit-Code 99 correct?
-        }
-        numBlocks = fsSize / SPB;
-        printf("This equals %u (0x%X) blocks of %d bytes each.\n",
-               numBlocks, numBlocks, BLOCK_SIZE);
-        if (numBlocks < 2) {
-            error("The File system has less than 2 blocks");
-            exit(99); // Exit-Code Number 99
-        }
-        blockTable = ((Block *) malloc(sizeof(Block) * numBlocks));
-        if (blockTable == NULL) {
-            error("Malloc for the Block-Table could not be executed\n");
-            exit(6); // Exit-Code Number 6
-        }
-        readBlock(disk, 0, blockBuffer);
-        blockPointer = blockBuffer;
-        blockPointer += 8; // skip the first two Blocks
-        inodeSize = get4Bytes(blockPointer);
-
-        inodeTable = (Inode*) malloc(sizeof(Inode) * INOPB * inodeSize);
-        if(inodeTable == NULL){
-            printf("Malloc for the Inode-Table could not be executed\n");
-            exit(6); // Exit-Code Number 6
-        }
-    }
-
 }
