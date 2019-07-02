@@ -2,7 +2,7 @@
  *     EOS32 File System Checker	   *
  *	   @version 1.0.0
  *	   @authors Pavlo Rozbytskyi
-*	            David Omran            *
+ *	            David Omran            *
  ***************************************/
 #include <stdio.h>
 #include <unistd.h>
@@ -13,10 +13,8 @@
 #include <errno.h>
 #include "main.h"
 
-// ToDo: David Exit Code 14 (Deadline 03.07)
 
 /* Exit-Codes ToDo:
-    Die Groesse einer Datei ist nicht konsistent mit den im Inode vermerkten Bloecken: Exit-Code 14.
     Alle anderen Dateisystem-Fehler: Exit-Code 99.
     Alle anderen Fehler: Exit-Code 9.
 */
@@ -37,6 +35,7 @@
 	Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
     Ein Block ist mehr als einmal in der Freiliste: Exit-Code 12.
 	Ein Block ist mehr als einmal in einer Datei oder in mehr als einer Datei: Exit-Code 13.
+    Die Groesse einer Datei ist nicht konsistent mit den im Inode vermerkten Bloecken: Exit-Code 14.
 	Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
 	Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18. 
 	Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
@@ -489,6 +488,10 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 				// reading double indirect block
 				indirectBlock(disk, addr, DOUBLE_INDIRECT);
 			}
+            if((size !=0 && blockNum!=0) && (size < ((blockNum-1)*BLOCK_SIZE) || size > (blockNum*BLOCK_SIZE))){
+                printf("The Inode at address %d with a size of (%d) is inconsistent with the number of blocks (%d) \n", addr, size, blockNum);
+                exit(DATA_SIZE_INCONSISTENT);
+            }
 		}else{
 			p += 32;
 		}
