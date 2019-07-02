@@ -1,7 +1,8 @@
 /***************************************
  *     EOS32 File System Checker	   *
- *	   @version 1.0.0				   *
- *	   @author Pavlo Rozbytskyi		   *
+ *	   @version 1.0.0
+ *	   @authors Pavlo Rozbytskyi
+*	            David Omran            *
  ***************************************/
 #include <stdio.h>
 #include <unistd.h>
@@ -12,14 +13,8 @@
 #include <errno.h>
 #include "main.h"
 
-/* ToDo-Group:
- * David: Exit-Code 13, 15-19
- * Pavlo: 
-*/
-
 /* Exit-Codes ToDo:
     Die Groesse einer Datei ist nicht konsistent mit den im Inode vermerkten Bloecken: Exit-Code 14.
-    
     Alle anderen Dateisystem-Fehler: Exit-Code 99.
     Alle anderen Fehler: Exit-Code 9.
 */
