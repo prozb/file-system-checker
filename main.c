@@ -20,7 +20,6 @@
 /* Exit-Codes ToDo:
     Die Groesse einer Datei ist nicht konsistent mit den im Inode vermerkten Bloecken: Exit-Code 14.
     
-    Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
     Alle anderen Dateisystem-Fehler: Exit-Code 99.
     Alle anderen Fehler: Exit-Code 9.
 */
@@ -47,6 +46,7 @@
 	Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
 	Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
 	Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
+	Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
 */
 
 static unsigned int fsStart;
@@ -201,15 +201,25 @@ void checkInodeErrors(FILE *disk, Inode_Info *inodeInfos, SuperBlock_Info *super
 			exit(INODE_LINK_COUNT_APPEARANCE_FALSE);
 		}
 		// Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
-		if(inodeInfos[i].link_count == 0 && inode->nlink > 0){
+		if(inodeInfos[i].parent && inodeInfos[i].link_count == 0){
 			fprintf(stderr, "inode [%d] with link count 0 is in %d directories", i, inode->nlink);
 			exit(INODE_LINK_COUNT_NULL_IN_DIR);
 		}
 
 		// Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
-		if(inode->nlink > 0 && inodeInfos[i].link_count == 0){
+		if(inodeInfos[i].parent && !inode->mode){
 			fprintf(stderr, "inode [%d] should be free but is in directory\n", i);
 			exit(INODE_FREE_IN_DIR);			
+		}
+		// Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
+		if(isDir(inode) && inodeInfos[i].parent == 0){
+			fprintf(stderr, "inode [%d] cannot be reached from root\n", i);
+			exit(ROOT_INODE_NOT_DIR);
+		}
+
+		if(inode->mode != 0 && !checkIllegalType(inode->mode)){
+			fprintf(stderr, "inode [%d] inode has illegal type\n", i);
+			exit(INODE_TYPE_FIELD_INVALID);			
 		}
 	}
 }
@@ -322,6 +332,7 @@ unsigned char stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t pa
 		free(refs);
 		// is not directory
 		inodeInfos[inodeNum].link_count = 1;
+		inodeInfos[inodeNum].parent = 1;
 
 		return 0;
 	}
@@ -364,6 +375,7 @@ void stepIntoDirectoryBlock(FILE *disk, EOS32_daddr_t parentInode,
 	}
 	// calculated links = i - 1 (".")  
 	inodeInfos[inodeNum].link_count += linksCount;
+	inodeInfos[inodeNum].parent = 1;
 }
 
 int isDir(Inode *inode){

@@ -57,6 +57,7 @@ typedef struct Block_Info {
 
 typedef struct Inode_Info{
     unsigned int link_count;      // inode occurrence calculated 
+    unsigned int parent;          // parent flag (for error message 21) 
 } Inode_Info;
 
 typedef struct Inode {
