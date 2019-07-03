@@ -49,6 +49,10 @@
 	Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
 */
 
+/* Tested commands:
+	Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
+ */
+
 static unsigned int fsStart;
 // information about all blocks in file system
 static Block_Info *blockInfos; 
@@ -86,7 +90,7 @@ int main(int argc, char *argv[]){
 	}
 
 	if(argc < 3){
-		fprintf(stderr, "incorrect program: \"%s\" start\n", argv[1]);
+		fprintf(stderr, "incorrect program: \"%s\" start\n", argv[0]);
 		exit(INCORRECT_START);
 	}
 
@@ -204,7 +208,7 @@ void checkInodeErrors(FILE *disk, Inode_Info *inodeInfos, SuperBlock_Info *super
 		// Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
 		if(isDir(inode) && inodeInfos[i].parent == 0){
 			fprintf(stderr, "inode [%d] cannot be reached from root\n", i);
-			exit(ROOT_INODE_NOT_DIR);
+			exit(DIR_CANNOT_BE_REACHED_FROM_ROOT);
 		}
 
 		if(inode->mode != 0 && !checkIllegalType(inode->mode)){
@@ -319,6 +323,8 @@ unsigned char stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t pa
 		}
 	free(refs);
 	}else{
+		//calculating file size, step into file block
+		
 		free(refs);
 		// is not directory
 		inodeInfos[inodeNum].link_count = 1;
@@ -327,6 +333,36 @@ unsigned char stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t pa
 		return 0;
 	}
 	return 1; // directory
+}
+
+void calculateInodeSize(Inode *inode, unsigned int *size){
+	for(int i = 0; i < 8; i++){
+		
+	}
+}
+
+void indirectBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char doubleIndirect) {
+  	unsigned char buffer [BLOCK_SIZE];
+	unsigned char *p;
+	EOS32_daddr_t addr;
+  	int i;
+
+	p = buffer;
+
+	readBlock(disk, blockNum, buffer);
+	for (i = 0; i < BLOCK_SIZE / sizeof(EOS32_daddr_t); i++) {
+		addr = get4Bytes(p);
+		p += 4;
+		
+		if(addr > 0){
+			blockInfos[addr].file_occur++;
+			if(doubleIndirect == DOUBLE_INDIRECT){
+				indirectBlock(disk, addr, SINGLE_INDIRECT);
+			}
+		}else{
+			break;
+		}
+	}
 }
 
 void stepIntoDirectoryBlock(FILE *disk, EOS32_daddr_t parentInode,
@@ -494,30 +530,6 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 			}
 		}else{
 			p += 32;
-		}
-	}
-}
-
-void indirectBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char doubleIndirect) {
-  	unsigned char buffer [BLOCK_SIZE];
-	unsigned char *p;
-	EOS32_daddr_t addr;
-  	int i;
-
-	p = buffer;
-
-	readBlock(disk, blockNum, buffer);
-	for (i = 0; i < BLOCK_SIZE / sizeof(EOS32_daddr_t); i++) {
-		addr = get4Bytes(p);
-		p += 4;
-		
-		if(addr > 0){
-			blockInfos[addr].file_occur++;
-			if(doubleIndirect == DOUBLE_INDIRECT){
-				indirectBlock(disk, addr, SINGLE_INDIRECT);
-			}
-		}else{
-			break;
 		}
 	}
 }
