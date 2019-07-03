@@ -1,7 +1,8 @@
 /***************************************
  *     EOS32 File System Checker	   *
- *	   @version 1.0.0				   *
- *	   @author Pavlo Rozbytskyi		   *
+ *	   @version 1.0.0
+ *	   @authors Pavlo Rozbytskyi
+ *	            David Omran            *
  ***************************************/
 #include <stdio.h>
 #include <unistd.h>
@@ -12,14 +13,8 @@
 #include <errno.h>
 #include "main.h"
 
-/* ToDo-Group:
- * David: Exit-Code 13, 15-19
- * Pavlo: 
-*/
 
 /* Exit-Codes ToDo:
-    Die Groesse einer Datei ist nicht konsistent mit den im Inode vermerkten Bloecken: Exit-Code 14.
-    
     Alle anderen Dateisystem-Fehler: Exit-Code 99.
     Alle anderen Fehler: Exit-Code 9.
 */
@@ -40,6 +35,7 @@
 	Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
     Ein Block ist mehr als einmal in der Freiliste: Exit-Code 12.
 	Ein Block ist mehr als einmal in einer Datei oder in mehr als einer Datei: Exit-Code 13.
+    Die Groesse einer Datei ist nicht konsistent mit den im Inode vermerkten Bloecken: Exit-Code 14.
 	Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
 	Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18. 
 	Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
@@ -55,7 +51,7 @@
 
 static unsigned int fsStart;
 // information about all blocks in file system
-static Block_Info *blockInfos; 
+static Block_Info *blockInfos;
 // information about all inodes in file system
 static Inode_Info *inodeInfos;
 // file system start position
@@ -174,7 +170,7 @@ int main(int argc, char *argv[]){
 	return 0;
 }
 
-void checkInodeErrors(FILE *disk, Inode_Info *inodeInfos, SuperBlock_Info *superBlock){
+void checkInodeErrors(FILE *disk, Inode_Info *inodeInfo, SuperBlock_Info *superBlock){
 	Inode *inode;
 	inode = malloc(sizeof(Inode));
 	if(inode == NULL){
@@ -183,30 +179,30 @@ void checkInodeErrors(FILE *disk, Inode_Info *inodeInfos, SuperBlock_Info *super
 	for(int i = 1; i < superBlock->isize * INOPB; i++){
 		readInode2(disk, inode, i);
 		// Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
-		if(inodeInfos[i].link_count == 0 && inode->mode != 0){
+		if(inodeInfo[i].link_count == 0 && inode->mode != 0){
 			fprintf(stderr, "inode [%d] with link count 0 is not free\n", i);
 			exit(INODE_LINK_COUNT_NULL_NOT_FREE);
 		}
 		// Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
-		if(inodeInfos[i].link_count != 0 && (inodeInfos[i].link_count != inode->nlink)){
+		if(inodeInfo[i].link_count != 0 && (inodeInfo[i].link_count != inode->nlink)){
 			fprintf(stderr, "inode [%d] with link count %d is not exactly in %d directories\n", i,
-			inode->nlink, inodeInfos[i].link_count);
+			inode->nlink, inodeInfo[i].link_count);
 
 			exit(INODE_LINK_COUNT_APPEARANCE_FALSE);
 		}
 		// Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
-		if(inodeInfos[i].parent && inodeInfos[i].link_count == 0){
+		if(inodeInfo[i].parent && inodeInfo[i].link_count == 0){
 			fprintf(stderr, "inode [%d] with link count 0 is in %d directories", i, inode->nlink);
 			exit(INODE_LINK_COUNT_NULL_IN_DIR);
 		}
 
 		// Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
-		if(inodeInfos[i].parent && !inode->mode){
+		if(inodeInfo[i].parent && !inode->mode){
 			fprintf(stderr, "inode [%d] should be free but is in directory\n", i);
 			exit(INODE_FREE_IN_DIR);			
 		}
 		// Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
-		if(isDir(inode) && inodeInfos[i].parent == 0){
+		if(isDir(inode) && inodeInfo[i].parent == 0){
 			fprintf(stderr, "inode [%d] cannot be reached from root\n", i);
 			exit(DIR_CANNOT_BE_REACHED_FROM_ROOT);
 		}
@@ -218,29 +214,29 @@ void checkInodeErrors(FILE *disk, Inode_Info *inodeInfos, SuperBlock_Info *super
 	}
 }
 
-void checkBlockInfos(SuperBlock_Info *superBlock, Block_Info *blockInfos){
+void checkBlockInfos(SuperBlock_Info *superBlock, Block_Info *blockInfo){
 	// skipping boot block, superblock and inode blocks
 	for(int i = superBlock->isize + 2; i < superBlock->fsize; i++){
 		// checking block is neither in file or in free list
-		if(blockInfos[i].file_occur == 0 &&
-		   blockInfos[i].free_list_occur == 0){
+		if(blockInfo[i].file_occur == 0 &&
+		   blockInfo[i].free_list_occur == 0){
 			fprintf(stderr, "block [%d] is neither in file or in free list\n", i);
 			exit(NEITHER_IN_FILE_OR_FREELIST);
 		}
 
-		if(blockInfos[i].file_occur > 0 &&
-		   blockInfos[i].free_list_occur > 0){
-			fprintf(stderr, "block [%d] is in file and in free list\n");
+		if(blockInfo[i].file_occur > 0 &&
+		   blockInfo[i].free_list_occur > 0){
+			fprintf(stderr, "block [%d] is in file and in free list\n", i);
 			exit(IN_FILE_IN_FREELIST);
 		}
 
-		if(blockInfos[i].free_list_occur > 1){
-			fprintf(stderr, "block [%d] has multiple occurrences in free list\n");
+		if(blockInfo[i].free_list_occur > 1){
+			fprintf(stderr, "block [%d] has multiple occurrences in free list\n", i);
 			exit(NEITHER_IN_FILE_OR_FREELIST);
 		}
 
-		if(blockInfos[i].file_occur > 1){
-			fprintf(stderr, "block [%d] has multiple occurrences files\n");
+		if(blockInfo[i].file_occur > 1){
+			fprintf(stderr, "block [%d] has multiple occurrences files\n", i);
 			exit(BLOCK_DUPLICATE_DATA);
 		}
 	}
@@ -528,6 +524,10 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 				// reading double indirect block
 				indirectBlock(disk, addr, DOUBLE_INDIRECT);
 			}
+            if((size !=0 && blockNum!=0) && (size < ((blockNum-1)*BLOCK_SIZE) || size > (blockNum*BLOCK_SIZE))){
+                printf("The Inode at address %d with a size of (%d) is inconsistent with the number of blocks (%d) \n", addr, size, blockNum);
+                exit(DATA_SIZE_INCONSISTENT);
+            }
 		}else{
 			p += 32;
 		}
