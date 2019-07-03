@@ -51,6 +51,7 @@
 
 /* Tested commands:
 	Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
+	Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18. 
  */
 
 static unsigned int fsStart;
@@ -66,15 +67,11 @@ static unsigned int fsStart;
 int main(int argc, char *argv[]){
 	FILE *disk;
 	
-	// free blocks list (need to check that files are not in this list) 
-	EOS32_daddr_t freeList[NICFREE];
 	unsigned char partTable[SECTOR_SIZE];
 	unsigned char blockBuffer[BLOCK_SIZE];
-    unsigned char *blockPointer;
 	unsigned char *ptptr;
 	unsigned int fsSize;
 	unsigned int partType;
-	unsigned int freeListSize;
     unsigned int numBlocks;
 	int part;
 
@@ -100,6 +97,7 @@ int main(int argc, char *argv[]){
 	}
 
 	disk = fopen(argv[1], "rb");
+
   	if (disk == NULL) {
     	fprintf(stderr, "cannot open disk image file '%s', %d", argv[1], errno);
 		exit(IO_ERROR);
@@ -170,6 +168,7 @@ int main(int argc, char *argv[]){
 	// handling inode errors
 	checkInodeErrors(disk, inodeInfos, superBlock);
 
+	fprintf(stdout, "completed\n");
 	fclose(disk);
 	return 0;
 }
@@ -178,6 +177,7 @@ void checkInodeErrors(FILE *disk, Inode_Info *inodeInfos, SuperBlock_Info *super
 	Inode *inode;
 	inode = malloc(sizeof(Inode));
 	if(inode == NULL){
+		fprintf(stderr, "memory allocation error\n");
 		exit(MEMORY_ALLOC_ERROR);
 	}
 	for(int i = 1; i < superBlock->isize * INOPB; i++){
@@ -268,6 +268,7 @@ void readSystemFiles(FILE *disk, SuperBlock_Info *superBlock){
 	readInode2(disk, inode, 1);
 	if(!isDir(inode)){
 		// throw exception if root inode is not dir
+		fprintf(stderr, "root inode is not dir\n");
 		exit(ROOT_INODE_NOT_DIR);
 	}
 	free(inode);
@@ -294,10 +295,12 @@ unsigned char stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t pa
 	
 	if(!isDir(inode) && inodeNum == 1){
 		// throw exception if root inode is not dir
+		fprintf(stderr, "root inode not dir\n");
 		exit(ROOT_INODE_NOT_DIR);
 	}
 	// checking invalid type
 	if(!checkIllegalType(inode->mode)){
+		fprintf(stderr, "inode type invalid\n");
 		exit(INODE_TYPE_FIELD_INVALID);
 	}
 
@@ -558,6 +561,7 @@ void freeBlock(FILE *disk, EOS32_daddr_t *freeList, EOS32_daddr_t freeBlksSize){
 
 				newFreeList = malloc(sizeof(unsigned int) * nfree);
 				if(newFreeList == NULL){
+					fprintf(stderr, "memory allocation error\n");
 					exit(MEMORY_ALLOC_ERROR);
 				}
 
