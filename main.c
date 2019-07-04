@@ -189,8 +189,8 @@ void checkInodeErrors(FILE *disk, Inode_Info *inodeInfos, SuperBlock_Info *super
 		}
 		// Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
 		if(inodeInfos[i].link_count != 0 && (inodeInfos[i].link_count != inode->nlink)){
-			fprintf(stderr, "inode [%d] with link count %d is not exactly in %d directories\n", i,
-			inode->nlink, inodeInfos[i].link_count);
+			fprintf(stderr, "inode [%d] is in %d, but has link count %d\n", i,
+			inodeInfos[i].link_count, inode->nlink);
 
 			exit(INODE_LINK_COUNT_APPEARANCE_FALSE);
 		}
@@ -236,7 +236,7 @@ void checkBlockInfos(SuperBlock_Info *superBlock, Block_Info *blockInfos){
 
 		if(blockInfos[i].free_list_occur > 1){
 			fprintf(stderr, "block [%d] has multiple occurrences in free list\n");
-			exit(NEITHER_IN_FILE_OR_FREELIST);
+			exit(MULTIPLE_TIMES_FREELIST);
 		}
 
 		if(blockInfos[i].file_occur > 1){
