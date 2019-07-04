@@ -12,7 +12,7 @@ Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18.
 11.img wirft EXIT 11
 12.img wirft EXIT 12
 14.img wirft nichts (EXIT 14 auskommentiert, fehlerhaft)
-15.img wirft EXIT 15 (aber printout ist falsch!) // inode [1] with link count 0 is not exactly in 11 directories 
+15.img wirft EXIT 15
 16.img wirft EXIT 16
 17.img wirft EXIT 17 
 18.img wirft nichts (m�sste EXIT 18 werfen!)

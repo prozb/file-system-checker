@@ -271,6 +271,8 @@ void readSystemFiles(FILE *disk, SuperBlock_Info *superBlock){
 		fprintf(stderr, "root inode is not dir\n");
 		exit(ROOT_INODE_NOT_DIR);
 	}
+	// parent of root is root
+	inodeInfos[1].parent = 1;
 	free(inode);
 	// steping into root inode
 	stepIntoInode(disk, 1, 0);
