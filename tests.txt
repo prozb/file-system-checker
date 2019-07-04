@@ -1,0 +1,8 @@
+// Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
+./fspoke disk.img 0 8256 w 16804  // setting type of root to file
+./fspoke disk.img 0 8256 w 12781  // reverting
+
+Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18. 
+./fspoke disk1.img 0 8320 w 1  // setting type of root to invalid
+./fspoke disk1.img 0 8320 w 12781  
+

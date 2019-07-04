@@ -1,3 +1,8 @@
+/***************************************
+ *     EOS32 File System Checker	   *
+ *	   @version 1.0.0				   *
+ *	   @author Pavlo Rozbytskyi		   *
+ ***************************************/
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
@@ -9,25 +14,19 @@
 
 /* ToDo-Group:
  * David: Exit-Code 13, 15-19
- * Pavlo: recursive traversal over file system 
+ * Pavlo: 
 */
 
 /* Exit-Codes ToDo:
     Die Groesse einer Datei ist nicht konsistent mit den im Inode vermerkten Bloecken: Exit-Code 14.
-    Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
-    Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
-    Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
-    Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18.
-    Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
-    Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
-    Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
+    
     Alle anderen Dateisystem-Fehler: Exit-Code 99.
     Alle anderen Fehler: Exit-Code 9.
 */
 
 /* Exit-Codes pending
     Erfolgloser Aufruf von malloc(): Exit-Code 6.
-    */
+*/
 
 
 /* Exit-Codes DONE
@@ -41,27 +40,38 @@
 	Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
     Ein Block ist mehr als einmal in der Freiliste: Exit-Code 12.
 	Ein Block ist mehr als einmal in einer Datei oder in mehr als einer Datei: Exit-Code 13.
+	Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
+	Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18. 
+	Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
+	Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
+	Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
+	Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
+	Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
 */
+
+/* Tested commands:
+	Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
+	Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18. 
+ */
 
 static unsigned int fsStart;
 // information about all blocks in file system
 static Block_Info *blockInfos; 
-unsigned int fsStart;
+// information about all inodes in file system
+static Inode_Info *inodeInfos;
+// file system start position
+static unsigned int fsStart;
 
 #define DEBUG
 
 int main(int argc, char *argv[]){
 	FILE *disk;
 	
-	// free blocks list (need to check that files are not in this list) 
-	EOS32_daddr_t freeList[NICFREE];
 	unsigned char partTable[SECTOR_SIZE];
 	unsigned char blockBuffer[BLOCK_SIZE];
-    unsigned char *blockPointer;
 	unsigned char *ptptr;
 	unsigned int fsSize;
 	unsigned int partType;
-	unsigned int freeListSize;
     unsigned int numBlocks;
 	int part;
 
@@ -77,7 +87,7 @@ int main(int argc, char *argv[]){
 	}
 
 	if(argc < 3){
-		fprintf(stderr, "incorrect program: \"%s\" start\n", argv[1]);
+		fprintf(stderr, "incorrect program: \"%s\" start\n", argv[0]);
 		exit(INCORRECT_START);
 	}
 
@@ -87,6 +97,7 @@ int main(int argc, char *argv[]){
 	}
 
 	disk = fopen(argv[1], "rb");
+
   	if (disk == NULL) {
     	fprintf(stderr, "cannot open disk image file '%s', %d", argv[1], errno);
 		exit(IO_ERROR);
@@ -122,8 +133,8 @@ int main(int argc, char *argv[]){
         exit(UNDEFINED_FILE_SYSTEM_ERROR); // ToDo, is Exit-Code 99 correct?
     }
     numBlocks = fsSize / SPB;
-    printf("This equals %u (0x%X) blocks of %d bytes each.\n",
-           numBlocks, numBlocks, BLOCK_SIZE);
+    // printf("This equals %u (0x%X) blocks of %d bytes each.\n",
+    //        numBlocks, numBlocks, BLOCK_SIZE);
     if (numBlocks < 2) {
         fprintf(stderr, "The File system has less than 2 blocks");
         exit(UNDEFINED_FILE_SYSTEM_ERROR); // Exit-Code Number 99
@@ -140,26 +151,71 @@ int main(int argc, char *argv[]){
 		fprintf(stderr, "cannot allocate memory for list with information about each system block\n");
 		exit(MEMORY_ALLOC_ERROR);
 	}
-	
-	#ifdef DEBUG
-	// for(int i = 0; i < superBlock->nfree; i++){
-	// 	fprintf(stdout, "free block[%d] = %d\n", i, superBlock->free_blocks[i]);
-	// }
-	#endif
+
+	// allocating memory for inode information
+	inodeInfos = malloc(INOPB * superBlock->isize * sizeof(Inode_Info));
+	if(inodeInfos == NULL){
+		fprintf(stderr, "cannot allocate memory for list with information about each inode\n");
+		exit(MEMORY_ALLOC_ERROR);
+	}
+
 	// reading inode table (inoded per block is 64)
 	readInodeTable(disk, superBlock);
 	readFreeBlocks(disk, superBlock);
 	checkBlockInfos(superBlock, blockInfos);
+	// recursive reading system files
+	readSystemFiles(disk, superBlock);
+	// handling inode errors
+	checkInodeErrors(disk, inodeInfos, superBlock);
 
-	#ifdef DEBUG
-	// for(int i = 4900; i < 4999 ; i++){
-	// 	fprintf(stdout, "block [%d] = [%d , %d]\n", i, (blockInfos + i)->file_occur, 
-	// 	(blockInfos + i)->free_list_occur);
-	// }
-	#endif
-
+	fprintf(stdout, "completed\n");
 	fclose(disk);
 	return 0;
+}
+
+void checkInodeErrors(FILE *disk, Inode_Info *inodeInfos, SuperBlock_Info *superBlock){
+	Inode *inode;
+	inode = malloc(sizeof(Inode));
+	if(inode == NULL){
+		fprintf(stderr, "memory allocation error\n");
+		exit(MEMORY_ALLOC_ERROR);
+	}
+	for(int i = 1; i < superBlock->isize * INOPB; i++){
+		readInode2(disk, inode, i);
+		// Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
+		if(inodeInfos[i].link_count == 0 && inode->mode != 0){
+			fprintf(stderr, "inode [%d] with link count 0 is not free\n", i);
+			exit(INODE_LINK_COUNT_NULL_NOT_FREE);
+		}
+		// Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
+		if(inodeInfos[i].link_count != 0 && (inodeInfos[i].link_count != inode->nlink)){
+			fprintf(stderr, "inode [%d] with link count %d is not exactly in %d directories\n", i,
+			inode->nlink, inodeInfos[i].link_count);
+
+			exit(INODE_LINK_COUNT_APPEARANCE_FALSE);
+		}
+		// Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
+		if(inodeInfos[i].parent && inodeInfos[i].link_count == 0){
+			fprintf(stderr, "inode [%d] with link count 0 is in %d directories", i, inode->nlink);
+			exit(INODE_LINK_COUNT_NULL_IN_DIR);
+		}
+
+		// Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
+		if(inodeInfos[i].parent && !inode->mode){
+			fprintf(stderr, "inode [%d] should be free but is in directory\n", i);
+			exit(INODE_FREE_IN_DIR);			
+		}
+		// Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
+		if(isDir(inode) && inodeInfos[i].parent == 0){
+			fprintf(stderr, "inode [%d] cannot be reached from root\n", i);
+			exit(DIR_CANNOT_BE_REACHED_FROM_ROOT);
+		}
+
+		if(inode->mode != 0 && !checkIllegalType(inode->mode)){
+			fprintf(stderr, "inode [%d] inode has illegal type\n", i);
+			exit(INODE_TYPE_FIELD_INVALID);			
+		}
+	}
 }
 
 void checkBlockInfos(SuperBlock_Info *superBlock, Block_Info *blockInfos){
@@ -194,16 +250,239 @@ void readInodeTable(FILE *disk, SuperBlock_Info *superBlock){
 	// iterating over inode blocks
 	unsigned char buffer[BLOCK_SIZE];
 	unsigned char *p = buffer;
-	// todo: implement check bootable partition!!!
-	// not bootable partition doesnt have bootblock
+
 	for(int i = 2; i < superBlock->isize + 2; i++){
 		readInodeBlock(disk, i, p);
 	}
 }
 
-void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
-	readBlock(disk, blockNum, p);
+void readSystemFiles(FILE *disk, SuperBlock_Info *superBlock){
+	Inode *inode;
+	inode = malloc(sizeof(Inode));
+	// iterating over file system blocks
+	if(inode == NULL){
+		fprintf(stderr, "cannot allocate memory for inode\n");
+		exit(MEMORY_ALLOC_ERROR);
+	}
+	// start from root inode
+	readInode2(disk, inode, 1);
+	if(!isDir(inode)){
+		// throw exception if root inode is not dir
+		fprintf(stderr, "root inode is not dir\n");
+		exit(ROOT_INODE_NOT_DIR);
+	}
+	free(inode);
+	// steping into root inode
+	stepIntoInode(disk, 1, 0);
+}
 
+unsigned char stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t parentInode){
+	EOS32_daddr_t *refs;
+	Inode *inode;
+	inode = malloc(sizeof(Inode));
+	// iterating over file system blocks
+	if(inode == NULL){
+		fprintf(stderr, "cannot allocate memory for inode\n");
+		exit(MEMORY_ALLOC_ERROR);
+	}
+
+	refs = malloc(sizeof(EOS32_daddr_t) * 8);
+	if(refs == NULL){
+		fprintf(stderr, "cannot allocate memory for inode\n");
+		exit(MEMORY_ALLOC_ERROR);
+	}
+	readInode2(disk, inode, inodeNum);
+	
+	if(!isDir(inode) && inodeNum == 1){
+		// throw exception if root inode is not dir
+		fprintf(stderr, "root inode not dir\n");
+		exit(ROOT_INODE_NOT_DIR);
+	}
+	// checking invalid type
+	if(!checkIllegalType(inode->mode)){
+		fprintf(stderr, "inode type invalid\n");
+		exit(INODE_TYPE_FIELD_INVALID);
+	}
+
+	// traversal inode if directory
+	if(isDir(inode)){	
+		// todo: copy pointers
+		for(int i = 0; i < 8; i++){
+			refs[i] = inode->refs[i];
+		}
+		free(inode);
+		// recursive descent into all directory blocks of current directory
+		for(int i = 0; i < INODE_BLOCKS_COUNT; i++){
+			if(refs[i] == 0){
+				// directory does not contain more directories 
+				break;
+			}
+			// handling simple cases with direct blocks
+			if(i < 6){
+				stepIntoDirectoryBlock(disk, parentInode, inodeNum, refs[i]);
+			}else {
+				//todo: handling single and double indirection
+			}
+		}
+	free(refs);
+	}else{
+		//calculating file size, step into file block
+		
+		free(refs);
+		// is not directory
+		inodeInfos[inodeNum].link_count = 1;
+		inodeInfos[inodeNum].parent = 1;
+
+		return 0;
+	}
+	return 1; // directory
+}
+
+void calculateInodeSize(Inode *inode, unsigned int *size){
+	for(int i = 0; i < 8; i++){
+		
+	}
+}
+
+void indirectBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char doubleIndirect) {
+  	unsigned char buffer [BLOCK_SIZE];
+	unsigned char *p;
+	EOS32_daddr_t addr;
+  	int i;
+
+	p = buffer;
+
+	readBlock(disk, blockNum, buffer);
+	for (i = 0; i < BLOCK_SIZE / sizeof(EOS32_daddr_t); i++) {
+		addr = get4Bytes(p);
+		p += 4;
+		
+		if(addr > 0){
+			blockInfos[addr].file_occur++;
+			if(doubleIndirect == DOUBLE_INDIRECT){
+				indirectBlock(disk, addr, SINGLE_INDIRECT);
+			}
+		}else{
+			break;
+		}
+	}
+}
+
+void stepIntoDirectoryBlock(FILE *disk, EOS32_daddr_t parentInode,
+				 EOS32_daddr_t inodeNum, EOS32_daddr_t currentDirBlock){
+	// todo: count num of files
+	EOS32_ino_t ino;
+  	int i, j;
+	unsigned int linksCount = 0;
+	unsigned char buffer[BLOCK_SIZE];
+	unsigned char *p = buffer;
+	unsigned char dirFlag;
+
+	readBlock(disk, currentDirBlock, p);
+	for (i = 0; i < DIRPB; i++) {
+		// getting inode number 
+		ino = get4Bytes(p);
+		
+		// step into inode if its not current inode, zero inode or parent
+		if(ino != inodeNum && ino != 0 && ino != parentInode){
+			dirFlag = stepIntoInode(disk, ino, inodeNum);
+			// count directories
+			if(dirFlag){
+				linksCount++;
+			}
+		}else if((ino == inodeNum || ino == parentInode) && ino != 0){
+			// count links to parent and current inode as well
+			linksCount++;
+		}
+		
+		if(ino == 0){
+			// no more inodes in this directory
+			break;
+		}
+		// move pointer to next dir
+		p += DIRSIZ + 4;
+	}
+	// calculated links = i - 1 (".")  
+	inodeInfos[inodeNum].link_count += linksCount;
+	inodeInfos[inodeNum].parent = 1;
+}
+
+int isDir(Inode *inode){
+	if((inode->mode & IFMT) == IFDIR){
+		return 1;
+	}
+	return 0;
+}
+
+int checkIllegalType(unsigned int mode){
+	if ((mode & IFMT) == IFREG ||
+	    (mode & IFMT) == IFDIR ||
+		(mode & IFMT) == IFCHR || 
+		(mode & IFMT) == IFBLK){
+		
+		return 1;
+	}
+	return 0;
+}
+
+void readInode2(FILE *disk, Inode *node, unsigned int inoNum){
+	unsigned char buffer[BLOCK_SIZE];
+	unsigned char *p = buffer;
+	
+	unsigned int blockNum = inoNum / INOPB + 2;
+	unsigned int position = inoNum % INOPB;
+	// reading block with current inode 
+	readBlock(disk, blockNum, p);
+	// move pointer to inode
+	p += INOPB * position;
+	// reading inode
+	readInode(p, node);	
+}
+
+void readInode(unsigned char *p, Inode *node){
+	unsigned int _mode;
+  	unsigned int _nlink;
+  	EOS32_off_t _size;
+	EOS32_daddr_t _addr;
+	EOS32_daddr_t _refs [INODE_BLOCKS_COUNT];
+
+	_mode = get4Bytes(p);
+	p += 4;
+		
+	_nlink = get4Bytes(p);
+	p += 24;
+
+	_size = get4Bytes(p);
+	p += 4;
+
+	node->mode 	= _mode;
+	node->nlink = _nlink;
+	node->size  = _size;
+	node->refs  = _refs;
+	// reading addresses
+	// skipping handling blocks of character and block devices
+	if (((_mode & IFMT) != IFCHR) && ((_mode & IFMT) != IFBLK)) {
+		for (int j = 0; j < 6; j++) {
+			// iterating over direct blocks
+			_addr = get4Bytes(p);
+			p += 4;
+
+			_refs[j] = _addr;
+		}
+		
+		// getting single indirect
+		_addr	 = get4Bytes(p);
+		_refs[6] = _addr;
+
+		p += 4;
+		
+		// getting double indirect
+		_addr = get4Bytes(p);
+		_refs[7] = _addr;
+	}
+}
+
+void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 	unsigned int mode;
   	unsigned int nlink;
   	EOS32_off_t size;
@@ -211,8 +490,8 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 
   	int i, j;
 
+	readBlock(disk, blockNum, p);
   	for (i = 0; i < INOPB; i++) {
-		unsigned char *backup = p;
     	mode = get4Bytes(p);
     	p += 4;
 		
@@ -258,30 +537,6 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 	}
 }
 
-void indirectBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char doubleIndirect) {
-  	unsigned char buffer [BLOCK_SIZE];
-	unsigned char *p;
-	EOS32_daddr_t addr;
-  	int i;
-
-	p = buffer;
-
-	readBlock(disk, blockNum, buffer);
-	for (i = 0; i < BLOCK_SIZE / sizeof(EOS32_daddr_t); i++) {
-		addr = get4Bytes(p);
-		p += 4;
-		
-		if(addr > 0){
-			blockInfos[addr].file_occur++;
-			if(doubleIndirect == DOUBLE_INDIRECT){
-				indirectBlock(disk, addr, SINGLE_INDIRECT);
-			}
-		}else{
-			break;
-		}
-	}
-}
-
 void readFreeBlocks(FILE *disk, SuperBlock_Info *superBlock_Info){
 	EOS32_daddr_t freeBlksSize = superBlock_Info->nfree;
 	EOS32_daddr_t *freeList     = superBlock_Info->free_blocks;
@@ -306,6 +561,7 @@ void freeBlock(FILE *disk, EOS32_daddr_t *freeList, EOS32_daddr_t freeBlksSize){
 
 				newFreeList = malloc(sizeof(unsigned int) * nfree);
 				if(newFreeList == NULL){
+					fprintf(stderr, "memory allocation error\n");
 					exit(MEMORY_ALLOC_ERROR);
 				}
 
