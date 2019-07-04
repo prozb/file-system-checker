@@ -1,4 +1,4 @@
-// Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
+﻿// Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
 ./fspoke disk.img 0 8256 w 16804  // setting type of root to file
 ./fspoke disk.img 0 8256 w 12781  // reverting
 
@@ -15,7 +15,7 @@ Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18.
 15.img wirft EXIT 15
 16.img wirft EXIT 16
 17.img wirft EXIT 17 
-18.img wirft EXIT 18 (muss man aber image anpassen)
-19.img wift EXIT 19
-20.img wirft EXIT 20
+18.img wirft EXIT 20 (ist korrekt)
+19.img wift nichts (m�sste EXIT 19 werfen!)
+20.img wirft nichts (m�sste EXIT 20 werfen!)
 21.img wirft EXIT CODE 16
