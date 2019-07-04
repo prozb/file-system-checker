@@ -6,6 +6,10 @@ Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18.
 ./fspoke disk1.img 0 8320 w 1  // setting type of root to invalid
 ./fspoke disk1.img 0 8320 w 12781  
 
+Ein Inode hat einem Link-Count von 0, aber befindet sich in einem Directory: Exit-Code 19. 
+./fspoke disk19_2.img 0 8324 w 0  // setting link count of root to 0
+./fspoke disk19_2.img 0 8324 w 11  
+
 *TESTING*
 
 10.img wirft EXIT 10
@@ -15,7 +19,8 @@ Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18.
 15.img wirft EXIT 15
 16.img wirft EXIT 16
 17.img wirft EXIT 17 
-18.img wirft EXIT 20 (ist korrekt)
-19.img wift nichts (m�sste EXIT 19 werfen!)
-20.img wirft nichts (m�sste EXIT 20 werfen!)
+18.img wirft EXIT 20 // EXIT 18 erfolgreich getestet (oben)
+19.img wirft EXIT 20 // EXIT 19 erfolgreich getestet (oben)
+19_2.img wirft EXIT 19
+20.img wirft EXIT 20
 21.img wirft EXIT CODE 16
