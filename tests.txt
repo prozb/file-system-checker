@@ -3,3 +3,16 @@
 ./fspoke disk.img 0 8256 w 12781  // reverting
 
 
+*TESTING*
+
+10.img wirft EXIT 10
+11.img wirft EXIT 11
+12.img wirft EXIT 12
+14.img wirft nichts (EXIT 14 auskommentiert, fehlerhaft)
+15.img wirft EXIT 15 (aber printout ist falsch!) // inode [1] with link count 0 is not exactly in 11 directories 
+16.img wirft EXIT 16
+17.img wirft EXIT 17 (aber printout falsch!) // inode [1] with link count 10 is not exactly in 11 directories  
+18.img wirft nichts (müsste EXIT 18 werfen!)
+19.img wift nichts (müsste EXIT 19 werfen!)
+20.img wirft nichts (müsste EXIT 20 werfen!)
+21.img wirft EXIT CODE 16

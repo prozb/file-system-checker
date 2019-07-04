@@ -524,10 +524,10 @@ void readInodeBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *p){
 				// reading double indirect block
 				indirectBlock(disk, addr, DOUBLE_INDIRECT);
 			}
-            if((size !=0 && blockNum!=0) && (size < ((blockNum-1)*BLOCK_SIZE) || size > (blockNum*BLOCK_SIZE))){
+          /*  if((size !=0 && blockNum!=0) && (size < ((blockNum-1)*BLOCK_SIZE) || size > (blockNum*BLOCK_SIZE))){
                 printf("The Inode at address %d with a size of (%d) is inconsistent with the number of blocks (%d) \n", addr, size, blockNum);
                 exit(DATA_SIZE_INCONSISTENT);
-            }
+            }*/
 		}else{
 			p += 32;
 		}

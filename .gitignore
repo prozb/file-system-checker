@@ -13,3 +13,5 @@ eosfiles/shfs
 CMakeLists\.txt
 cmake-build-debug
 
+
+*.img
