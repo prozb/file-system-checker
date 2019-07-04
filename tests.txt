@@ -15,7 +15,7 @@ Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18.
 15.img wirft EXIT 15
 16.img wirft EXIT 16
 17.img wirft EXIT 17 
-18.img wirft nichts
-19.img wift nichts (m�sste EXIT 19 werfen!)
-20.img wirft nichts (m�sste EXIT 20 werfen!)
+18.img wirft EXIT 18 (muss man aber image anpassen)
+19.img wift EXIT 19
+20.img wirft EXIT 20
 21.img wirft EXIT CODE 16

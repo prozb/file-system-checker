@@ -302,7 +302,7 @@ unsigned char stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t pa
 	}
 	// checking invalid type
 	if(!checkIllegalType(inode->mode)){
-		fprintf(stderr, "inode type invalid\n");
+		fprintf(stderr, "inode [%d] type invalid\n", inodeNum);
 		exit(INODE_TYPE_FIELD_INVALID);
 	}
 
