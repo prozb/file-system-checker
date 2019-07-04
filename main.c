@@ -297,12 +297,12 @@ unsigned char stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t pa
 	
 	if(!isDir(inode) && inodeNum == 1){
 		// throw exception if root inode is not dir
-		fprintf(stderr, "root inode not dir\n");
+		fprintf(stderr, "root inode is not dir\n");
 		exit(ROOT_INODE_NOT_DIR);
 	}
 	// checking invalid type
 	if(!checkIllegalType(inode->mode)){
-		fprintf(stderr, "inode type invalid\n");
+		fprintf(stderr, "inode [%d] type invalid\n", inodeNum);
 		exit(INODE_TYPE_FIELD_INVALID);
 	}
 
