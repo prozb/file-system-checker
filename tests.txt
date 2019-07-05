@@ -13,6 +13,12 @@ Ein Inode hat einem Link-Count von 0, aber befindet sich in einem Directory: Exi
 Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
 ./fspoke 21_2.img 0 8388 w 0  // setting link count of a directory inode to 0  
 
+Testing size and double indirection
+ ./fspoke disk-double-indirect.img 0 5058560 w 35
+ ./fspoke disk-double-indirect.img 0 5058564 w 46 
+ ./fspoke disk-double-indirect.img 0 5058568 w 0 
+ ./fspoke disk-double-indirect.img 0 8508 w 1235 
+
 *TESTING*
 
 10.img wirft EXIT 10

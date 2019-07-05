@@ -386,7 +386,7 @@ void visitBlock(FILE *disk, EOS32_daddr_t blockNum, EOS32_daddr_t *size, unsigne
 		
 		if(addr > 0){
 			if(doubleIndirect == DOUBLE_INDIRECT){
-				indirectBlock(disk, addr, SINGLE_INDIRECT);
+				visitBlock(disk, addr, size, SINGLE_INDIRECT);
 			}else{
 				*size += 1;	
 			}
