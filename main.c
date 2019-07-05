@@ -13,40 +13,6 @@
 #include <errno.h>
 #include "main.h"
 
-/* ToDo-Group:
- * David: Exit-Code 13, 15-19
- * Pavlo: 
-*/
-
-/* Exit-Codes ToDo:
-    Die Groesse einer Datei ist nicht konsistent mit den im Inode vermerkten Bloecken: Exit-Code 14.
-    Alle anderen Dateisystem-Fehler: Exit-Code 99.
-    Alle anderen Fehler: Exit-Code 9.
-*/
-
-/* Exit-Codes DONE
-    Falscher Aufruf des Programms: Exit-Code 1.
-    Image-Datei nicht gefunden: Exit-Code 2.
-    Datei Ein/Ausgabefehler: Exit-Code 3.
-    Illegale Partitionsnummer: Exit-Code 4.
-    Partition enthaelt kein EOS32-Dateisystem: Exit-Code 5.
-    Erfolgloser Aufruf von malloc(): Exit-Code 6.
-*/
-
-/* Tested commands:
- * 	Ein Block ist weder in einer Datei noch auf der Freiliste: Exit-Code 10.
-	Ein Block ist sowohl in einer Datei als auch auf der Freiliste: Exit-Code 11.
-    Ein Block ist mehr als einmal in der Freiliste: Exit-Code 12.
-	Ein Block ist mehr als einmal in einer Datei oder in mehr als einer Datei: Exit-Code 13.
-	Ein Inode mit Linkcount n != 0 erscheint nicht in exakt n Verzeichnissen: Exit-Code 17.
-	Ein Inode mit Linkcount 0 ist nicht frei: Exit-Code 16.
-	Ein Inode mit Linkcount 0 erscheint in einem Verzeichnis: Exit-Code 15.
-	Ein Inode erscheint in einem Verzeichnis, ist aber frei: Exit-Code 19.
-	Ein Verzeichnis kann von der Wurzel aus nicht erreicht werden: Exit-Code 21.
-	Der Root-Inode ist kein Verzeichnis: Exit-Code 20.
-	Ein Inode hat ein Typfeld mit illegalem Wert: Exit-Code 18. 
- */
-
 static unsigned int fsStart;
 // information about all blocks in file system
 static Block_Info *blockInfos; 
@@ -123,11 +89,9 @@ int main(int argc, char *argv[]){
 
     if (fsSize % SPB != 0) {
         fprintf(stderr, "The File system size is not a multiple of block size\n");
-        exit(UNDEFINED_FILE_SYSTEM_ERROR); // ToDo, is Exit-Code 99 correct?
+        exit(UNDEFINED_FILE_SYSTEM_ERROR); 
     }
     numBlocks = fsSize / SPB;
-    // printf("This equals %u (0x%X) blocks of %d bytes each.\n",
-    //        numBlocks, numBlocks, BLOCK_SIZE);
     if (numBlocks < 2) {
         fprintf(stderr, "The File system has less than 2 blocks\n");
         exit(UNDEFINED_FILE_SYSTEM_ERROR); // Exit-Code Number 99
@@ -288,7 +252,6 @@ unsigned char stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t pa
 	}
 	readInode2(disk, inode, inodeNum);
 	
-	// todo: size
 	if(isFile(inode)){
 		calculateInodeSize(disk, inode, &inodeBlockSize);
 
@@ -422,7 +385,6 @@ void indirectBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char doubleIndir
 
 void stepIntoDirectoryBlock(FILE *disk, EOS32_daddr_t parentInode,
 				 EOS32_daddr_t inodeNum, EOS32_daddr_t currentDirBlock){
-	// todo: count num of files
 	EOS32_ino_t ino;
   	int i, j;
 	unsigned int linksCount = 0;
