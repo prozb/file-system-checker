@@ -279,6 +279,7 @@ void readSystemFiles(FILE *disk, SuperBlock_Info *superBlock){
 }
 
 unsigned char stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t parentInode){
+	EOS32_daddr_t inodeBlockSize = 0;
 	EOS32_daddr_t *refs;
 	Inode *inode;
 	inode = malloc(sizeof(Inode));
@@ -295,6 +296,23 @@ unsigned char stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t pa
 	}
 	readInode2(disk, inode, inodeNum);
 	
+	// todo: size
+	if(isFile(inode)){
+		calculateInodeSize(disk, inode, &inodeBlockSize);
+
+		if(inodeBlockSize > 0){
+			if(inodeBlockSize * BLOCK_SIZE < inode->size || 
+			   (inodeBlockSize - 1) * BLOCK_SIZE > inode->size){
+				fprintf(stdout, "inconsistent size of inode[%d] = %d\n should be beween %d and %d\n", inodeNum, inode->size, inodeBlockSize * BLOCK_SIZE,  (inodeBlockSize - 1) * BLOCK_SIZE);
+				exit(DATA_SIZE_INCONSISTENT);
+			}
+		}else if(inode->size != 0){
+			fprintf(stdout, "inconsistent size of inode[%d] = %d\n", inodeNum, inode->size);
+			exit(DATA_SIZE_INCONSISTENT);
+		}
+
+	}
+
 	if(!isDir(inode) && inodeNum == 1){
 		// throw exception if root inode is not dir
 		fprintf(stderr, "root inode is not dir\n");
@@ -340,9 +358,49 @@ unsigned char stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t pa
 	return 1; // directory
 }
 
-void calculateInodeSize(Inode *inode, unsigned int *size){
+int isFile(Inode *inode){
+	if ((inode->mode & IFMT) == IFREG) {
+        return 1;
+	} 
+	return 0;
+}
+
+void calculateInodeSize(FILE *disk, Inode *inode, EOS32_daddr_t *size){
 	for(int i = 0; i < 8; i++){
+		if(i == 6 && inode->refs[i] != 0){
+			visitBlock(disk, inode->refs[i], size, SINGLE_INDIRECT);
+		}else if(i == 7 && inode->refs[i] != 0){
+			visitBlock(disk, inode->refs[i], size, DOUBLE_INDIRECT);
+		}else if(inode->refs[i] == 0){
+			break;
+		}else{
+			*size += 1;
+		}
+	}
+}
+
+void visitBlock(FILE *disk, EOS32_daddr_t blockNum, EOS32_daddr_t *size, unsigned char doubleIndirect){
+	unsigned char buffer [BLOCK_SIZE];
+	unsigned char *p;
+	EOS32_daddr_t addr;
+  	int i;
+
+	p = buffer;
+
+	readBlock(disk, blockNum, buffer);
+	for (i = 0; i < BLOCK_SIZE / sizeof(EOS32_daddr_t); i++) {
+		addr = get4Bytes(p);
+		p += 4;
 		
+		if(addr > 0){
+			if(doubleIndirect == DOUBLE_INDIRECT){
+				indirectBlock(disk, addr, SINGLE_INDIRECT);
+			}else{
+				*size += 1;	
+			}
+		}else{
+			break;
+		}
 	}
 }
 
@@ -446,7 +504,11 @@ void readInode(unsigned char *p, Inode *node){
   	unsigned int _nlink;
   	EOS32_off_t _size;
 	EOS32_daddr_t _addr;
-	EOS32_daddr_t _refs [INODE_BLOCKS_COUNT];
+	EOS32_daddr_t *_refs = malloc(sizeof(EOS32_daddr_t) * 8);
+
+	if(_refs == NULL){
+		exit(MEMORY_ALLOC_ERROR);
+	} 
 
 	_mode = get4Bytes(p);
 	p += 4;
