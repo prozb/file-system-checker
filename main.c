@@ -691,7 +691,7 @@ void readBlock(FILE *disk, EOS32_daddr_t blockNum, unsigned char *blockBuffer) {
 	fseek(disk, fsStart * SECTOR_SIZE + blockNum * BLOCK_SIZE, SEEK_SET);
 
   	if (fread(blockBuffer, BLOCK_SIZE, 1, disk) != 1) {
-    	fprintf(stderr, "cannot read block %lu (0x%lX)\n", blockNum, blockNum);
+    	fprintf(stderr, "cannot read block %i (0x%iX)\n", blockNum, blockNum);
 		exit(IO_ERROR);
   	}
 }

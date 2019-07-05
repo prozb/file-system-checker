@@ -78,8 +78,12 @@ typedef struct SuperBlock_Info {
     unsigned int nfree;           // number of entries in free block list
 } SuperBlock_Info;
 
+
+int isFile(Inode *);
 int isDir(Inode *);
 int checkIllegalType(unsigned int);
+void visitBlock(FILE *, EOS32_daddr_t , EOS32_daddr_t *, unsigned char);
+void calculateInodeSize(FILE *, Inode *, EOS32_daddr_t *);
 unsigned int get4Bytes(unsigned char *);
 void checkInodeErrors(FILE *, Inode_Info *, SuperBlock_Info *);
 unsigned char stepIntoInode(FILE *, EOS32_daddr_t, EOS32_daddr_t);
