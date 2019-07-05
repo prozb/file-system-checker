@@ -235,7 +235,10 @@ void readSystemFiles(FILE *disk, SuperBlock_Info *superBlock){
 }
 
 unsigned char stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t parentInode){
+	unsigned char buffer[BLOCK_SIZE];
+	unsigned char *p = buffer;
 	EOS32_daddr_t inodeBlockSize = 0;
+	EOS32_daddr_t addr;
 	EOS32_daddr_t *refs;
 	Inode *inode;
 	inode = malloc(sizeof(Inode));
@@ -281,7 +284,7 @@ unsigned char stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t pa
 
 	// traversal inode if directory
 	if(isDir(inode)){	
-		// todo: copy pointers
+		// copy pointers
 		for(int i = 0; i < 8; i++){
 			refs[i] = inode->refs[i];
 		}
@@ -295,7 +298,17 @@ unsigned char stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t pa
 			// handling simple cases with direct blocks
 			if(i < 6){
 				stepIntoDirectoryBlock(disk, parentInode, inodeNum, refs[i]);
-			}else {
+			}else if(i == 6 && refs[i] != 0){
+				readBlock(disk, refs[i], p);
+				for(int j = 0; j < BLOCK_SIZE / sizeof(EOS32_daddr_t); j++){
+					addr = get4Bytes(p);
+					p += 4;
+					if(addr != 0){
+						stepIntoDirectoryBlock(disk, parentInode, inodeNum, addr);
+					}else{
+						break;
+					}
+				}
 				//todo: handling single and double indirection
 			}
 		}
