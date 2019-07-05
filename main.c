@@ -255,20 +255,17 @@ unsigned char stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t pa
 	}
 	readInode2(disk, inode, inodeNum);
 	
-	if(isFile(inode)){
-		calculateInodeSize(disk, inode, &inodeBlockSize);
+	calculateInodeSize(disk, inode, &inodeBlockSize);
 
-		if(inodeBlockSize > 0){
-			if(inodeBlockSize * BLOCK_SIZE < inode->size || 
-			   (inodeBlockSize - 1) * BLOCK_SIZE > inode->size){
-				fprintf(stdout, "inconsistent size of inode[%d] = %d\n should be beween %d and %d\n", inodeNum, inode->size, inodeBlockSize * BLOCK_SIZE,  (inodeBlockSize - 1) * BLOCK_SIZE);
-				exit(DATA_SIZE_INCONSISTENT);
-			}
-		}else if(inode->size != 0){
-			fprintf(stdout, "inconsistent size of inode[%d] = %d\n", inodeNum, inode->size);
+	if(inodeBlockSize > 0){
+		if(inodeBlockSize * BLOCK_SIZE < inode->size || 
+			(inodeBlockSize - 1) * BLOCK_SIZE > inode->size){
+			fprintf(stdout, "inconsistent size of inode[%d] = %d\n should be beween %d and %d\n", inodeNum, inode->size, inodeBlockSize * BLOCK_SIZE,  (inodeBlockSize - 1) * BLOCK_SIZE);
 			exit(DATA_SIZE_INCONSISTENT);
 		}
-
+	}else if(inode->size != 0){
+		fprintf(stdout, "inconsistent size of inode[%d] = %d\n", inodeNum, inode->size);
+		exit(DATA_SIZE_INCONSISTENT);
 	}
 
 	if(!isDir(inode) && inodeNum == 1){
@@ -295,21 +292,12 @@ unsigned char stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t pa
 				// directory does not contain more directories 
 				break;
 			}
-			// handling simple cases with direct blocks
 			if(i < 6){
 				stepIntoDirectoryBlock(disk, parentInode, inodeNum, refs[i]);
 			}else if(i == 6 && refs[i] != 0){
-				readBlock(disk, refs[i], p);
-				for(int j = 0; j < BLOCK_SIZE / sizeof(EOS32_daddr_t); j++){
-					addr = get4Bytes(p);
-					p += 4;
-					if(addr != 0){
-						stepIntoDirectoryBlock(disk, parentInode, inodeNum, addr);
-					}else{
-						break;
-					}
-				}
-				//todo: handling single and double indirection
+				stepIntoDirectory(disk, inodeNum, parentInode, refs[i], SINGLE_INDIRECT);
+			}else if(i == 7 && refs[i] != 0){
+				stepIntoDirectory(disk, inodeNum, parentInode, refs[i], DOUBLE_INDIRECT);
 			}
 		}
 	free(refs);
@@ -324,6 +312,27 @@ unsigned char stepIntoInode(FILE *disk, EOS32_daddr_t inodeNum, EOS32_daddr_t pa
 		return 0;
 	}
 	return 1; // directory
+}
+
+void stepIntoDirectory(FILE *disk, EOS32_daddr_t parentNode, EOS32_daddr_t inodeNum, EOS32_daddr_t ref, unsigned int doubleIndirect){
+	unsigned char buffer[BLOCK_SIZE];
+	unsigned char *p = buffer;
+	EOS32_daddr_t addr;
+
+	readBlock(disk, ref, p);
+	for(int j = 0; j < BLOCK_SIZE / sizeof(EOS32_daddr_t); j++){
+		addr = get4Bytes(p);
+		p += 4;
+		if(addr != 0){
+			if(doubleIndirect == DOUBLE_INDIRECT){
+				stepIntoDirectory(disk, parentNode, inodeNum, addr, SINGLE_INDIRECT);
+			}else{
+				stepIntoDirectoryBlock(disk, parentNode, inodeNum, addr);
+			}
+		}else{
+			break;
+		}
+	}
 }
 
 int isFile(Inode *inode){

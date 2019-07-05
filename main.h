@@ -81,6 +81,7 @@ typedef struct SuperBlock_Info {
 
 int isFile(Inode *);
 int isDir(Inode *);
+void stepIntoDirectory(FILE *, EOS32_daddr_t , EOS32_daddr_t , EOS32_daddr_t , unsigned int );
 int checkIllegalType(unsigned int);
 void visitBlock(FILE *, EOS32_daddr_t , EOS32_daddr_t *, unsigned char);
 void calculateInodeSize(FILE *, Inode *, EOS32_daddr_t *);
